@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Compliance Dashboard</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+  </head>
+  <body>
+    <div class="dashboard-container">
+      <!-- Header -->
+      <div class="dashboard-header">
+        <h1>
+          <span class="icon">🛡️</span>
+          Compliance Command Center
+        </h1>
+        <div class="last-updated">
+          Last updated: <span id="lastUpdated">--</span>
+        </div>
+      </div>
+
+      <!-- Compliance Health Score -->
+      <div class="section health-section">
+        <div class="section-header">
+          <h2>Compliance Health Score</h2>
+          <button class="refresh-btn" onclick="refreshData()">
+            🔄 Refresh
+          </button>
+        </div>
+        <div class="health-score-container">
+          <div class="score-circle" id="scoreCircle">
+            <div class="score-value" id="scoreValue">--</div>
+            <div class="score-label">/ 100</div>
+          </div>
+          <div class="score-details">
+            <div class="score-metric">
+              <span class="metric-label">Trend:</span>
+              <span class="metric-value" id="scoreTrend">--</span>
+            </div>
+            <div class="score-metric">
+              <span class="metric-label">Projects Monitored:</span>
+              <span class="metric-value" id="projectCount">--</span>
+            </div>
+            <div class="score-metric">
+              <span class="metric-label">Total Events (30d):</span>
+              <span class="metric-value" id="eventCount">--</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Regulatory Readiness Matrix -->
+      <div class="section matrix-section">
+        <h2>Regulatory Readiness Matrix</h2>
+        <div class="matrix-grid" id="regulationMatrix">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Risk Alerts -->
+      <div class="section risks-section">
+        <h2>
+          <span class="icon">⚠️</span>
+          Predicted Risks
+        </h2>
+        <div class="risk-list" id="riskList">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Pending Actions -->
+      <div class="section actions-section">
+        <h2>
+          <span class="icon">📋</span>
+          Pending Actions
+        </h2>
+        <div class="actions-list" id="actionsList">
+          <!-- Dynamically populated -->
+        </div>
+      </div>
+
+      <!-- Analytics Charts -->
+      <div class="section charts-section">
+        <div class="chart-container">
+          <h3>Events by Type</h3>
+          <canvas id="eventsChart"></canvas>
+        </div>
+        <div class="chart-container">
+          <h3>Risk Distribution</h3>
+          <canvas id="riskChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="section quick-actions">
+        <h2>Quick Actions</h2>
+        <div class="action-buttons">
+          <button class="action-btn" onclick="exportReport()">
+            📄 Export Report
+          </button>
+          <button class="action-btn" onclick="viewFullReport()">
+            📊 Full Report
+          </button>
+          <button class="action-btn" onclick="configureMonitoring()">
+            ⚙️ Configure
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script src="widget.js"></script>
+  </body>
+</html>

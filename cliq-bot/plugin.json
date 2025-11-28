@@ -1,0 +1,146 @@
+{
+  "name": "Compliance Command Center",
+  "description": "AI-orchestrated compliance engine that transforms team conversations into audit-ready documentation",
+  "version": "1.0.0",
+  "icon": "compliance-icon.png",
+  "developer": {
+    "name": "Zoho Cliqtrix 2025",
+    "contact": "cliqtrix@zoho.com"
+  },
+  "permissions": {
+    "messages": ["read", "write"],
+    "channels": ["read", "join"],
+    "users": ["read"],
+    "files": ["read"],
+    "webhooks": ["create"]
+  },
+  "bot": {
+    "name": "ComplianceBot",
+    "displayName": "Compliance Command Center",
+    "description": "Your intelligent compliance assistant",
+    "avatar": "bot-avatar.png",
+    "capabilities": {
+      "messageHandler": true,
+      "commandHandler": true,
+      "participantHandler": true,
+      "webhookHandler": true
+    }
+  },
+  "commands": [
+    {
+      "command": "/compliance-summary",
+      "description": "Generate instant compliance audit report for a project",
+      "usage": "/compliance-summary [project-name] [regulation?]",
+      "examples": [
+        "/compliance-summary product-release",
+        "/compliance-summary security-audit GDPR",
+        "/compliance-summary Q4-compliance SOC2"
+      ]
+    },
+    {
+      "command": "/compliance-health",
+      "description": "Show current compliance health score and status",
+      "usage": "/compliance-health [scope?]",
+      "examples": [
+        "/compliance-health",
+        "/compliance-health #product-team",
+        "/compliance-health engineering"
+      ]
+    },
+    {
+      "command": "/compliance-risks",
+      "description": "Display predicted compliance risks and bottlenecks",
+      "usage": "/compliance-risks [days-ahead?]",
+      "examples": [
+        "/compliance-risks",
+        "/compliance-risks 7",
+        "/compliance-risks 30"
+      ]
+    },
+    {
+      "command": "/compliance-export",
+      "description": "Export audit-ready compliance report",
+      "usage": "/compliance-export [project] [format]",
+      "examples": [
+        "/compliance-export product-launch PDF",
+        "/compliance-export Q4-audit Excel",
+        "/compliance-export security-review JSON"
+      ]
+    },
+    {
+      "command": "/compliance-monitor",
+      "description": "Enable/disable compliance monitoring for current channel",
+      "usage": "/compliance-monitor [on|off] [regulation?]",
+      "examples": [
+        "/compliance-monitor on",
+        "/compliance-monitor on GDPR",
+        "/compliance-monitor off"
+      ]
+    },
+    {
+      "command": "/compliance-help",
+      "description": "Show help and usage information",
+      "usage": "/compliance-help"
+    }
+  ],
+  "webhooks": [
+    {
+      "name": "message_received",
+      "url": "${CATALYST_BASE_URL}/functions/message-handler",
+      "events": ["message.created", "message.updated"]
+    },
+    {
+      "name": "file_uploaded",
+      "url": "${CATALYST_BASE_URL}/functions/file-handler",
+      "events": ["file.uploaded"]
+    },
+    {
+      "name": "participant_action",
+      "url": "${CATALYST_BASE_URL}/functions/participant-handler",
+      "events": ["participant.added", "participant.removed"]
+    }
+  ],
+  "widgets": [
+    {
+      "name": "compliance-dashboard",
+      "title": "Compliance Dashboard",
+      "description": "Live compliance health and regulatory readiness metrics",
+      "type": "panel",
+      "url": "${WIDGET_BASE_URL}/index.html",
+      "height": "600px",
+      "refresh": 30
+    }
+  ],
+  "configuration": {
+    "catalyst_project_id": {
+      "type": "string",
+      "required": true,
+      "description": "Zoho Catalyst Project ID"
+    },
+    "creator_app_id": {
+      "type": "string",
+      "required": true,
+      "description": "Zoho Creator App ID for compliance logs"
+    },
+    "zia_model_id": {
+      "type": "string",
+      "required": true,
+      "description": "Zia Skills Model ID for compliance extraction"
+    },
+    "default_regulations": {
+      "type": "array",
+      "default": ["SOC2", "GDPR", "ISO27001", "HIPAA"],
+      "description": "Default regulations to monitor"
+    },
+    "alert_threshold": {
+      "type": "number",
+      "default": 7.5,
+      "description": "Risk score threshold for alerts (0-10)"
+    },
+    "auto_report_schedule": {
+      "type": "string",
+      "default": "weekly",
+      "description": "Automatic report generation frequency (daily/weekly/monthly)"
+    }
+  }
+}

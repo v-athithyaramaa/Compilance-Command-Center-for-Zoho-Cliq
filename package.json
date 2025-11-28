@@ -1,0 +1,47 @@
+{
+  "name": "compliance-command-center",
+  "version": "1.0.0",
+  "description": "AI-orchestrated compliance engine for Zoho Cliq - Cliqtrix 2025 Contest Entry",
+  "main": "cliq-bot/bot-handler.js",
+  "scripts": {
+    "setup": "node scripts/interactive-setup.js",
+    "validate": "node scripts/validate-config.js",
+    "test": "jest",
+    "test:bot": "jest cliq-bot/__tests__",
+    "test:catalyst": "jest catalyst/__tests__",
+    "test:widget": "jest widget/__tests__",
+    "lint": "eslint . --ext .js",
+    "deploy:catalyst": "cd catalyst && catalyst deploy",
+    "deploy:bot": "cd cliq-bot && zoho-extension-toolkit deploy",
+    "deploy:widget": "cd widget && npm run build && catalyst hosting deploy",
+    "deploy:all": "npm run deploy:catalyst && npm run deploy:bot && npm run deploy:widget",
+    "dev:widget": "cd widget && npm run dev",
+    "validate:deluge": "node scripts/validate-deluge.js",
+    "validate:zia": "node scripts/validate-zia-config.js"
+  },
+  "keywords": [
+    "zoho",
+    "cliq",
+    "compliance",
+    "catalyst",
+    "zia",
+    "deluge",
+    "audit",
+    "governance"
+  ],
+  "author": "Cliqtrix 2025 Contestant",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.13.2",
+    "zcatalyst-sdk-node": "^2.5.1"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "jest": "^29.7.0",
+    "prettier": "^3.6.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/compliance-command-center"
+  }
+}

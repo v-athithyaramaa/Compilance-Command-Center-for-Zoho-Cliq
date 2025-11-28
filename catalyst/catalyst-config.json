@@ -1,0 +1,433 @@
+{
+  "project_name": "compliance-command-center-catalyst",
+  "description": "Backend services for Compliance Command Center",
+  "version": "1.0.0",
+  "region": "US",
+  "datastore": {
+    "tables": [
+      {
+        "table_name": "compliance_events",
+        "description": "Stores all compliance events extracted from Cliq messages",
+        "columns": [
+          {
+            "column_name": "event_id",
+            "data_type": "bigint",
+            "max_length": 20,
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "timestamp",
+            "data_type": "datetime",
+            "is_mandatory": true
+          },
+          {
+            "column_name": "channel_id",
+            "data_type": "varchar",
+            "max_length": 100,
+            "is_mandatory": true
+          },
+          {
+            "column_name": "channel_name",
+            "data_type": "varchar",
+            "max_length": 255
+          },
+          {
+            "column_name": "message_id",
+            "data_type": "varchar",
+            "max_length": 100,
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "user_id",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "user_name",
+            "data_type": "varchar",
+            "max_length": 255
+          },
+          {
+            "column_name": "event_type",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "regulation",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "risk_level",
+            "data_type": "varchar",
+            "max_length": 20
+          },
+          {
+            "column_name": "decision_type",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "message_text",
+            "data_type": "text"
+          },
+          {
+            "column_name": "evidence_url",
+            "data_type": "varchar",
+            "max_length": 500
+          },
+          {
+            "column_name": "confidence_score",
+            "data_type": "double"
+          },
+          {
+            "column_name": "stakeholders",
+            "data_type": "text"
+          },
+          {
+            "column_name": "deadline",
+            "data_type": "datetime"
+          },
+          {
+            "column_name": "project_id",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "status",
+            "data_type": "varchar",
+            "max_length": 50,
+            "default_value": "Pending Review"
+          },
+          {
+            "column_name": "zia_entities",
+            "data_type": "text"
+          },
+          {
+            "column_name": "created_at",
+            "data_type": "datetime",
+            "is_mandatory": true
+          }
+        ],
+        "indexes": [
+          {
+            "index_name": "idx_channel_timestamp",
+            "columns": ["channel_id", "timestamp"]
+          },
+          {
+            "index_name": "idx_regulation",
+            "columns": ["regulation"]
+          },
+          {
+            "index_name": "idx_risk_level",
+            "columns": ["risk_level"]
+          },
+          {
+            "index_name": "idx_project_id",
+            "columns": ["project_id"]
+          }
+        ]
+      },
+      {
+        "table_name": "risk_predictions",
+        "description": "Stores AI-generated risk predictions",
+        "columns": [
+          {
+            "column_name": "prediction_id",
+            "data_type": "bigint",
+            "max_length": 20,
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "project_id",
+            "data_type": "varchar",
+            "max_length": 100,
+            "is_mandatory": true
+          },
+          {
+            "column_name": "risk_category",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "severity",
+            "data_type": "varchar",
+            "max_length": 20
+          },
+          {
+            "column_name": "probability",
+            "data_type": "double"
+          },
+          {
+            "column_name": "predicted_impact_date",
+            "data_type": "datetime"
+          },
+          {
+            "column_name": "affected_teams",
+            "data_type": "text"
+          },
+          {
+            "column_name": "contributing_factors",
+            "data_type": "text"
+          },
+          {
+            "column_name": "recommendations",
+            "data_type": "text"
+          },
+          {
+            "column_name": "confidence",
+            "data_type": "double"
+          },
+          {
+            "column_name": "status",
+            "data_type": "varchar",
+            "max_length": 20,
+            "default_value": "Active"
+          },
+          {
+            "column_name": "created_at",
+            "data_type": "datetime",
+            "is_mandatory": true
+          },
+          {
+            "column_name": "resolved_at",
+            "data_type": "datetime"
+          }
+        ],
+        "indexes": [
+          {
+            "index_name": "idx_project_severity",
+            "columns": ["project_id", "severity"]
+          },
+          {
+            "index_name": "idx_status",
+            "columns": ["status"]
+          }
+        ]
+      },
+      {
+        "table_name": "compliance_analytics",
+        "description": "Stores aggregated analytics and ML training data",
+        "columns": [
+          {
+            "column_name": "analytics_id",
+            "data_type": "bigint",
+            "max_length": 20,
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "project_id",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "date",
+            "data_type": "date",
+            "is_mandatory": true
+          },
+          {
+            "column_name": "total_events",
+            "data_type": "int"
+          },
+          {
+            "column_name": "compliance_score",
+            "data_type": "double"
+          },
+          {
+            "column_name": "high_risk_count",
+            "data_type": "int"
+          },
+          {
+            "column_name": "pending_approvals",
+            "data_type": "int"
+          },
+          {
+            "column_name": "avg_response_time_hours",
+            "data_type": "double"
+          },
+          {
+            "column_name": "events_by_type",
+            "data_type": "text"
+          },
+          {
+            "column_name": "events_by_regulation",
+            "data_type": "text"
+          },
+          {
+            "column_name": "team_velocity",
+            "data_type": "double"
+          },
+          {
+            "column_name": "created_at",
+            "data_type": "datetime",
+            "is_mandatory": true
+          }
+        ],
+        "indexes": [
+          {
+            "index_name": "idx_project_date",
+            "columns": ["project_id", "date"]
+          }
+        ]
+      },
+      {
+        "table_name": "audit_logs",
+        "description": "Immutable audit trail for compliance exports",
+        "columns": [
+          {
+            "column_name": "log_id",
+            "data_type": "bigint",
+            "max_length": 20,
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "event_ids",
+            "data_type": "text",
+            "description": "JSON array of included event IDs"
+          },
+          {
+            "column_name": "export_timestamp",
+            "data_type": "datetime",
+            "is_mandatory": true
+          },
+          {
+            "column_name": "exported_by",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "project_id",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "regulation",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "period_start",
+            "data_type": "date"
+          },
+          {
+            "column_name": "period_end",
+            "data_type": "date"
+          },
+          {
+            "column_name": "report_hash",
+            "data_type": "varchar",
+            "max_length": 64,
+            "description": "SHA-256 hash for tamper detection"
+          },
+          {
+            "column_name": "previous_hash",
+            "data_type": "varchar",
+            "max_length": 64,
+            "description": "Blockchain-style chain"
+          },
+          {
+            "column_name": "storage_url",
+            "data_type": "varchar",
+            "max_length": 500,
+            "description": "External storage location (S3/GCS)"
+          },
+          {
+            "column_name": "metadata",
+            "data_type": "text"
+          }
+        ],
+        "indexes": [
+          {
+            "index_name": "idx_project_export",
+            "columns": ["project_id", "export_timestamp"]
+          }
+        ]
+      },
+      {
+        "table_name": "ml_training_data",
+        "description": "Historical data for ML model training",
+        "columns": [
+          {
+            "column_name": "training_id",
+            "data_type": "bigint",
+            "max_length": 20,
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "project_id",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "feature_vector",
+            "data_type": "text",
+            "description": "JSON of input features"
+          },
+          {
+            "column_name": "actual_outcome",
+            "data_type": "varchar",
+            "max_length": 50,
+            "description": "Actual result (delayed/on-time/early)"
+          },
+          {
+            "column_name": "predicted_outcome",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "prediction_accuracy",
+            "data_type": "double"
+          },
+          {
+            "column_name": "recorded_at",
+            "data_type": "datetime",
+            "is_mandatory": true
+          }
+        ],
+        "indexes": [
+          {
+            "index_name": "idx_recorded_at",
+            "columns": ["recorded_at"]
+          }
+        ]
+      }
+    ]
+  },
+  "functions": [
+    "message-handler",
+    "file-handler",
+    "participant-handler",
+    "store-compliance-event",
+    "generate-summary",
+    "health-score",
+    "predict-risks",
+    "export-report",
+    "send-risk-alert",
+    "process-compliance-event",
+    "train-ml-model",
+    "audit-export"
+  ],
+  "cron": [
+    {
+      "name": "daily-analytics-aggregation",
+      "schedule": "0 2 * * *",
+      "description": "Aggregate daily compliance analytics"
+    },
+    {
+      "name": "ml-model-retraining",
+      "schedule": "0 3 * * 0",
+      "description": "Retrain ML models weekly"
+    },
+    {
+      "name": "audit-log-export",
+      "schedule": "0 1 * * *",
+      "description": "Export audit logs to external storage"
+    }
+  ]
+}

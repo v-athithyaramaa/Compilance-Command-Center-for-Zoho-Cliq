@@ -1,0 +1,330 @@
+{
+  "model_name": "Compliance Risk Predictor",
+  "model_id": "risk_predictor_v1",
+  "description": "Predicts compliance bottlenecks and risks based on historical patterns and current project state",
+  "version": "1.0.0",
+  "type": "predictive_analytics",
+  "prediction_window": {
+    "min_days": 1,
+    "max_days": 90,
+    "default_days": 7
+  },
+  "input_features": [
+    {
+      "name": "team_response_time",
+      "type": "numeric",
+      "description": "Historical average response time for team (in hours)",
+      "source": "catalyst_analytics",
+      "weight": 0.25
+    },
+    {
+      "name": "dependency_chain_length",
+      "type": "numeric",
+      "description": "Number of sequential dependencies",
+      "source": "zoho_projects_api",
+      "weight": 0.2
+    },
+    {
+      "name": "days_until_deadline",
+      "type": "numeric",
+      "description": "Days remaining until project deadline",
+      "source": "extracted_from_messages",
+      "weight": 0.15
+    },
+    {
+      "name": "pending_approvals",
+      "type": "numeric",
+      "description": "Number of pending compliance approvals",
+      "source": "compliance_events",
+      "weight": 0.15
+    },
+    {
+      "name": "team_workload",
+      "type": "numeric",
+      "description": "Current team capacity utilization (0-1)",
+      "source": "zoho_projects_api",
+      "weight": 0.1
+    },
+    {
+      "name": "historical_delay_rate",
+      "type": "numeric",
+      "description": "Percentage of past projects delayed",
+      "source": "catalyst_analytics",
+      "weight": 0.1
+    },
+    {
+      "name": "compliance_event_velocity",
+      "type": "numeric",
+      "description": "Rate of compliance events per day",
+      "source": "compliance_events",
+      "weight": 0.05
+    }
+  ],
+  "risk_categories": [
+    {
+      "name": "approval_delay",
+      "description": "Risk of approval taking longer than expected",
+      "severity_mapping": {
+        "critical": {
+          "threshold": 0.85,
+          "description": "Approval will likely miss deadline by >5 days"
+        },
+        "high": {
+          "threshold": 0.7,
+          "description": "Approval may miss deadline by 2-5 days"
+        },
+        "medium": {
+          "threshold": 0.5,
+          "description": "Approval timing is tight but achievable"
+        },
+        "low": {
+          "threshold": 0.3,
+          "description": "Approval timeline has buffer"
+        }
+      },
+      "triggers": [
+        "pending_approvals > 3",
+        "team_response_time > 48",
+        "days_until_deadline < 7"
+      ]
+    },
+    {
+      "name": "dependency_bottleneck",
+      "description": "Risk of cross-team dependency causing delays",
+      "severity_mapping": {
+        "critical": {
+          "threshold": 0.9,
+          "description": "Multiple critical path dependencies at risk"
+        },
+        "high": {
+          "threshold": 0.75,
+          "description": "Key dependency likely to cause delay"
+        },
+        "medium": {
+          "threshold": 0.55,
+          "description": "Some dependency concerns"
+        },
+        "low": {
+          "threshold": 0.35,
+          "description": "Dependencies on track"
+        }
+      },
+      "triggers": [
+        "dependency_chain_length > 4",
+        "team_workload > 0.85",
+        "historical_delay_rate > 0.4"
+      ]
+    },
+    {
+      "name": "documentation_gap",
+      "description": "Risk of incomplete compliance documentation",
+      "severity_mapping": {
+        "critical": {
+          "threshold": 0.88,
+          "description": "Major documentation missing with audit imminent"
+        },
+        "high": {
+          "threshold": 0.72,
+          "description": "Significant documentation gaps"
+        },
+        "medium": {
+          "threshold": 0.52,
+          "description": "Some documentation incomplete"
+        },
+        "low": {
+          "threshold": 0.32,
+          "description": "Documentation mostly complete"
+        }
+      },
+      "triggers": [
+        "compliance_event_velocity < 0.5",
+        "days_until_deadline < 14",
+        "pending_approvals > 5"
+      ]
+    },
+    {
+      "name": "resource_constraint",
+      "description": "Risk of team bandwidth limiting compliance progress",
+      "severity_mapping": {
+        "critical": {
+          "threshold": 0.92,
+          "description": "Team severely overloaded"
+        },
+        "high": {
+          "threshold": 0.78,
+          "description": "Team approaching capacity limits"
+        },
+        "medium": {
+          "threshold": 0.58,
+          "description": "Team workload elevated"
+        },
+        "low": {
+          "threshold": 0.38,
+          "description": "Team has adequate capacity"
+        }
+      },
+      "triggers": [
+        "team_workload > 0.90",
+        "pending_approvals > 4",
+        "dependency_chain_length > 3"
+      ]
+    }
+  ],
+  "prediction_algorithm": {
+    "type": "ensemble",
+    "models": [
+      {
+        "name": "gradient_boosting",
+        "weight": 0.4,
+        "parameters": {
+          "n_estimators": 100,
+          "max_depth": 5,
+          "learning_rate": 0.1
+        }
+      },
+      {
+        "name": "random_forest",
+        "weight": 0.35,
+        "parameters": {
+          "n_estimators": 150,
+          "max_depth": 8,
+          "min_samples_split": 5
+        }
+      },
+      {
+        "name": "neural_network",
+        "weight": 0.25,
+        "parameters": {
+          "layers": [64, 32, 16],
+          "activation": "relu",
+          "dropout": 0.2
+        }
+      }
+    ],
+    "aggregation": "weighted_average"
+  },
+  "learning_parameters": {
+    "retrain_frequency": "weekly",
+    "min_training_samples": 100,
+    "validation_split": 0.25,
+    "early_stopping": {
+      "enabled": true,
+      "patience": 10,
+      "min_delta": 0.001
+    }
+  },
+  "output_format": {
+    "predictions": [
+      {
+        "risk_id": "string",
+        "risk_category": "string",
+        "severity": "string",
+        "probability": "float (0-1)",
+        "predicted_impact_date": "ISO8601",
+        "affected_entities": {
+          "teams": ["string"],
+          "projects": ["string"],
+          "regulations": ["string"]
+        },
+        "contributing_factors": [
+          {
+            "factor": "string",
+            "impact_score": "float",
+            "current_value": "numeric",
+            "threshold_value": "numeric"
+          }
+        ],
+        "recommendations": [
+          {
+            "action": "string",
+            "priority": "string",
+            "estimated_effort": "string",
+            "expected_risk_reduction": "float"
+          }
+        ],
+        "confidence": "float (0-1)"
+      }
+    ],
+    "summary": {
+      "total_risks": "integer",
+      "by_severity": {
+        "critical": "integer",
+        "high": "integer",
+        "medium": "integer",
+        "low": "integer"
+      },
+      "overall_risk_score": "float (0-10)",
+      "trend": "string (improving|stable|deteriorating)"
+    }
+  },
+  "recommendation_engine": {
+    "enabled": true,
+    "strategies": [
+      {
+        "risk_category": "approval_delay",
+        "recommendations": [
+          {
+            "condition": "team_response_time > 72",
+            "action": "Escalate to manager for priority review",
+            "priority": "high"
+          },
+          {
+            "condition": "pending_approvals > 5",
+            "action": "Schedule dedicated approval session",
+            "priority": "high"
+          },
+          {
+            "condition": "days_until_deadline < 5",
+            "action": "Request expedited review process",
+            "priority": "critical"
+          }
+        ]
+      },
+      {
+        "risk_category": "dependency_bottleneck",
+        "recommendations": [
+          {
+            "condition": "dependency_chain_length > 5",
+            "action": "Parallelize independent tasks",
+            "priority": "medium"
+          },
+          {
+            "condition": "team_workload > 0.90",
+            "action": "Allocate additional resources or extend timeline",
+            "priority": "high"
+          }
+        ]
+      },
+      {
+        "risk_category": "documentation_gap",
+        "recommendations": [
+          {
+            "condition": "compliance_event_velocity < 0.3",
+            "action": "Schedule documentation sprint",
+            "priority": "high"
+          },
+          {
+            "condition": "days_until_deadline < 10",
+            "action": "Auto-generate draft documentation from existing events",
+            "priority": "critical"
+          }
+        ]
+      }
+    ]
+  },
+  "historical_accuracy_metrics": {
+    "track_predictions": true,
+    "metrics": [
+      "precision",
+      "recall",
+      "f1_score",
+      "mean_absolute_error",
+      "prediction_lead_time"
+    ],
+    "feedback_loop": {
+      "enabled": true,
+      "collect_actual_outcomes": true,
+      "adjust_model_weights": true
+    }
+  }
+}

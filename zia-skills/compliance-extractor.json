@@ -1,0 +1,474 @@
+{
+  "model_name": "Compliance Event Extractor",
+  "model_id": "compliance_extractor_v1",
+  "description": "Extracts compliance-relevant events, regulations, and risk indicators from team conversations",
+  "version": "1.0.0",
+  "language": "en",
+  "training_data_source": "compliance_conversations_dataset",
+  "entities": [
+    {
+      "name": "compliance_event",
+      "type": "classification",
+      "description": "Type of compliance-relevant event detected",
+      "values": [
+        {
+          "label": "approval",
+          "keywords": [
+            "approved",
+            "sign off",
+            "authorized",
+            "greenlight",
+            "okayed",
+            "accepted"
+          ],
+          "patterns": [
+            "@\\w+ approved",
+            "got approval from",
+            "signed off on",
+            "authorization received"
+          ]
+        },
+        {
+          "label": "risk_discussion",
+          "keywords": [
+            "risk",
+            "concern",
+            "issue",
+            "problem",
+            "vulnerability",
+            "threat",
+            "exposure"
+          ],
+          "patterns": [
+            "security risk",
+            "compliance risk",
+            "potential issue",
+            "we need to document",
+            "this could be a problem"
+          ]
+        },
+        {
+          "label": "decision",
+          "keywords": [
+            "decided",
+            "decision",
+            "chose",
+            "selected",
+            "determined",
+            "resolved"
+          ],
+          "patterns": [
+            "we decided to",
+            "decision made",
+            "team agreed",
+            "final decision",
+            "consensus reached"
+          ]
+        },
+        {
+          "label": "milestone",
+          "keywords": [
+            "completed",
+            "finished",
+            "done",
+            "delivered",
+            "released",
+            "deployed"
+          ],
+          "patterns": [
+            "testing completed",
+            "review finished",
+            "deployment successful",
+            "milestone reached",
+            "phase complete"
+          ]
+        },
+        {
+          "label": "audit_action",
+          "keywords": [
+            "audit",
+            "review",
+            "inspection",
+            "assessment",
+            "verification",
+            "validation"
+          ],
+          "patterns": [
+            "audit completed",
+            "review scheduled",
+            "compliance check",
+            "assessment performed"
+          ]
+        },
+        {
+          "label": "data_handling",
+          "keywords": [
+            "data",
+            "PII",
+            "personal information",
+            "customer data",
+            "sensitive",
+            "confidential"
+          ],
+          "patterns": [
+            "data migration",
+            "processing personal data",
+            "storing customer information",
+            "data retention",
+            "data deletion"
+          ]
+        },
+        {
+          "label": "access_control",
+          "keywords": [
+            "access",
+            "permission",
+            "role",
+            "privilege",
+            "authentication",
+            "authorization"
+          ],
+          "patterns": [
+            "granted access",
+            "permission changed",
+            "role assigned",
+            "access revoked",
+            "user provisioned"
+          ]
+        },
+        {
+          "label": "incident",
+          "keywords": [
+            "incident",
+            "breach",
+            "outage",
+            "failure",
+            "error",
+            "bug",
+            "vulnerability"
+          ],
+          "patterns": [
+            "security incident",
+            "data breach",
+            "system outage",
+            "critical error",
+            "vulnerability discovered"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "regulation_type",
+      "type": "classification",
+      "description": "Specific regulation or compliance framework referenced",
+      "values": [
+        {
+          "label": "GDPR",
+          "keywords": [
+            "GDPR",
+            "General Data Protection",
+            "Article 32",
+            "right to erasure",
+            "data subject",
+            "EU privacy"
+          ],
+          "patterns": [
+            "GDPR compliance",
+            "GDPR Article \\d+",
+            "EU data protection",
+            "personal data processing"
+          ]
+        },
+        {
+          "label": "SOC2",
+          "keywords": [
+            "SOC 2",
+            "SOC2",
+            "Service Organization Control",
+            "Type II",
+            "Type 2",
+            "AICPA"
+          ],
+          "patterns": [
+            "SOC 2 audit",
+            "SOC2 compliance",
+            "Type II certification",
+            "SOC 2 controls"
+          ]
+        },
+        {
+          "label": "HIPAA",
+          "keywords": [
+            "HIPAA",
+            "PHI",
+            "protected health information",
+            "healthcare privacy",
+            "HITECH"
+          ],
+          "patterns": [
+            "HIPAA compliance",
+            "PHI handling",
+            "healthcare data",
+            "patient information"
+          ]
+        },
+        {
+          "label": "ISO27001",
+          "keywords": ["ISO 27001", "ISO27001", "information security", "ISMS"],
+          "patterns": [
+            "ISO 27001 certification",
+            "ISMS audit",
+            "ISO security controls"
+          ]
+        },
+        {
+          "label": "PCI_DSS",
+          "keywords": [
+            "PCI DSS",
+            "PCI",
+            "payment card",
+            "cardholder data",
+            "credit card"
+          ],
+          "patterns": [
+            "PCI compliance",
+            "card data security",
+            "payment processing"
+          ]
+        },
+        {
+          "label": "CCPA",
+          "keywords": [
+            "CCPA",
+            "California Consumer Privacy",
+            "consumer data rights"
+          ],
+          "patterns": [
+            "CCPA compliance",
+            "California privacy",
+            "consumer opt-out"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "risk_level",
+      "type": "classification",
+      "description": "Severity/priority level of the compliance event",
+      "values": [
+        {
+          "label": "Critical",
+          "keywords": [
+            "critical",
+            "urgent",
+            "emergency",
+            "immediate",
+            "severe",
+            "blocker"
+          ],
+          "patterns": [
+            "critical issue",
+            "urgent action required",
+            "immediate attention",
+            "severe risk"
+          ]
+        },
+        {
+          "label": "High",
+          "keywords": [
+            "high priority",
+            "important",
+            "significant",
+            "major",
+            "serious"
+          ],
+          "patterns": [
+            "high risk",
+            "major concern",
+            "significant impact",
+            "serious issue"
+          ]
+        },
+        {
+          "label": "Medium",
+          "keywords": ["medium", "moderate", "standard", "normal"],
+          "patterns": ["moderate risk", "medium priority", "standard procedure"]
+        },
+        {
+          "label": "Low",
+          "keywords": [
+            "low priority",
+            "minor",
+            "small",
+            "trivial",
+            "informational"
+          ],
+          "patterns": ["low risk", "minor issue", "informational only"]
+        }
+      ]
+    },
+    {
+      "name": "decision_type",
+      "type": "classification",
+      "description": "Type of decision made (for decision events)",
+      "values": [
+        {
+          "label": "architectural",
+          "keywords": [
+            "architecture",
+            "design",
+            "technical approach",
+            "solution design"
+          ],
+          "patterns": [
+            "architectural decision",
+            "design choice",
+            "technical approach"
+          ]
+        },
+        {
+          "label": "security",
+          "keywords": [
+            "security",
+            "encryption",
+            "authentication",
+            "authorization",
+            "protection"
+          ],
+          "patterns": [
+            "security decision",
+            "encryption method",
+            "access control strategy"
+          ]
+        },
+        {
+          "label": "data_governance",
+          "keywords": [
+            "data retention",
+            "data classification",
+            "data lifecycle",
+            "data ownership"
+          ],
+          "patterns": [
+            "data retention policy",
+            "classification decision",
+            "data lifecycle"
+          ]
+        },
+        {
+          "label": "vendor_selection",
+          "keywords": [
+            "vendor",
+            "third-party",
+            "supplier",
+            "partner",
+            "provider"
+          ],
+          "patterns": [
+            "vendor selection",
+            "third-party chosen",
+            "supplier decision"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "stakeholder",
+      "type": "extraction",
+      "description": "Key stakeholders or teams involved",
+      "patterns": [
+        "@[\\w-]+",
+        "#[\\w-]+",
+        "(legal|security|compliance|engineering|product|marketing|sales) team",
+        "(CTO|CISO|CPO|CEO|CFO)",
+        "(manager|director|VP|lead|officer)"
+      ]
+    },
+    {
+      "name": "deadline",
+      "type": "extraction",
+      "description": "Dates and deadlines mentioned",
+      "patterns": [
+        "\\d{1,2}/\\d{1,2}/\\d{2,4}",
+        "\\d{4}-\\d{2}-\\d{2}",
+        "(today|tomorrow|next week|next month)",
+        "(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)",
+        "by (EOD|end of day|end of week|end of month)",
+        "due (on|by|in) [\\w\\s,]+"
+      ]
+    }
+  ],
+  "context_analysis": {
+    "enabled": true,
+    "window_size": 5,
+    "description": "Analyzes surrounding messages for additional context",
+    "features": [
+      "thread_detection",
+      "conversation_flow",
+      "participant_roles",
+      "topic_clustering"
+    ]
+  },
+  "confidence_thresholds": {
+    "compliance_event": 0.75,
+    "regulation_type": 0.7,
+    "risk_level": 0.65,
+    "decision_type": 0.7,
+    "stakeholder": 0.8,
+    "deadline": 0.85
+  },
+  "post_processing": {
+    "normalize_entities": true,
+    "resolve_references": true,
+    "extract_metadata": true,
+    "link_related_events": true
+  },
+  "output_format": {
+    "entities": {
+      "compliance_event": {
+        "value": "string",
+        "confidence": "float",
+        "position": "[start, end]"
+      },
+      "regulation_type": {
+        "value": "string",
+        "confidence": "float"
+      },
+      "risk_level": {
+        "value": "string",
+        "confidence": "float"
+      },
+      "decision_type": {
+        "value": "string",
+        "confidence": "float"
+      },
+      "stakeholders": [
+        {
+          "name": "string",
+          "type": "string",
+          "confidence": "float"
+        }
+      ],
+      "deadlines": [
+        {
+          "date": "ISO8601",
+          "context": "string",
+          "confidence": "float"
+        }
+      ]
+    },
+    "metadata": {
+      "processing_time_ms": "integer",
+      "model_version": "string",
+      "confidence": "float"
+    }
+  },
+  "training_configuration": {
+    "algorithm": "transformer_based",
+    "base_model": "zia-nlp-v3",
+    "epochs": 50,
+    "batch_size": 32,
+    "learning_rate": 0.0001,
+    "validation_split": 0.2
+  }
+}

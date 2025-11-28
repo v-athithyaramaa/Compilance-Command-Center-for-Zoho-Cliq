@@ -1,0 +1,623 @@
+/*
+ * Cross-Platform Dependency Mapper
+ * Integrates with Zoho Projects, Calendar, and Cliq to predict bottlenecks
+ */
+
+// Configuration
+config = {
+    "creator_app": "compliance_tracker",
+    "projects_portal": "compliance_projects",
+    "risk_threshold": 7.5,
+    "alert_days_ahead": 3
+};
+
+// Main dependency analysis function
+void analyzeDependencyRisks()
+{
+    try
+    {
+        info "Starting dependency risk analysis...";
+        
+        // Get all active compliance projects
+        activeProjects = getActiveProjects();
+        
+        for each project in activeProjects
+        {
+            projectId = project.get("Project_ID");
+            projectName = project.get("Project_Name");
+            
+            // Calculate risk score for this project
+            riskScore = calculateProjectRiskScore(projectId);
+            
+            info "Project: " + projectName + " - Risk Score: " + riskScore;
+            
+            // If risk exceeds threshold, send alert
+            if(riskScore > config.get("risk_threshold"))
+            {
+                sendDependencyAlert(project, riskScore);
+            }
+            
+            // Update risk score in database
+            updateRiskScore(projectId, riskScore);
+        }
+        
+        info "Dependency risk analysis completed";
+    }
+    catch (e)
+    {
+        info "Error in dependency analysis: " + e;
+    }
+}
+
+// Get active compliance projects
+List getActiveProjects()
+{
+    try
+    {
+        criteria = "Status == \"Active\" && Monitoring_Enabled == true";
+        projects = zoho.creator.getRecords(
+            config.get("creator_app"),
+            "All_Project_Settings",
+            criteria,
+            "compliance_connection"
+        );
+        return projects;
+    }
+    catch (e)
+    {
+        info "Error fetching projects: " + e;
+        return List();
+    }
+}
+
+// Calculate comprehensive risk score for project
+Decimal calculateProjectRiskScore(String projectId)
+{
+    // Get all risk factors
+    daysUntilDeadline = getDaysUntilDeadline(projectId);
+    avgTeamResponseTime = getAverageTeamResponseTime(projectId);
+    dependencyChainLength = getDependencyChainLength(projectId);
+    pendingApprovals = getPendingApprovalsCount(projectId);
+    teamWorkload = getTeamWorkload(projectId);
+    historicalDelayRate = getHistoricalDelayRate(projectId);
+    
+    // Weighted risk calculation
+    // Formula: (days * 0.3) + (responseTime * 0.4) + (chainLength * 0.3)
+    
+    // Normalize factors to 0-10 scale
+    deadlineFactor = normalizeDeadlineFactor(daysUntilDeadline);
+    responseTimeFactor = normalizeResponseTime(avgTeamResponseTime);
+    dependencyFactor = normalizeDependencyChain(dependencyChainLength);
+    approvalFactor = normalizeApprovals(pendingApprovals);
+    workloadFactor = normalizeWorkload(teamWorkload);
+    delayFactor = normalizeDelayRate(historicalDelayRate);
+    
+    // Calculate weighted risk score
+    riskScore = (deadlineFactor * 0.20) +
+                (responseTimeFactor * 0.25) +
+                (dependencyFactor * 0.20) +
+                (approvalFactor * 0.15) +
+                (workloadFactor * 0.12) +
+                (delayFactor * 0.08);
+    
+    return riskScore.round(2);
+}
+
+// Get days until project deadline
+Decimal getDaysUntilDeadline(String projectId)
+{
+    try
+    {
+        // Query Zoho Projects for deadline
+        projectResponse = invokeurl
+        [
+            url: "https://projectsapi.zoho.com/restapi/portal/" + config.get("projects_portal") + "/projects/" + projectId + "/"
+            type: GET
+            connection: "projects_connection"
+        ];
+        
+        endDate = projectResponse.get("projects").get(0).get("end_date");
+        deadline = endDate.toDate();
+        currentDate = zoho.currentdate;
+        
+        daysDiff = daysBetween(currentDate, deadline);
+        return daysDiff;
+    }
+    catch (e)
+    {
+        info "Error getting deadline: " + e;
+        return 30; // Default to 30 days
+    }
+}
+
+// Get average team response time from Cliq messages
+Decimal getAverageTeamResponseTime(String projectId)
+{
+    try
+    {
+        // Get project's channel ID
+        projectRec = zoho.creator.getRecordById(
+            config.get("creator_app"),
+            "All_Project_Settings",
+            projectId,
+            "compliance_connection"
+        );
+        
+        channelId = projectRec.get("Channel_ID");
+        
+        // Query compliance events from last 30 days
+        endDate = zoho.currentdate;
+        startDate = endDate.subDay(30);
+        
+        criteria = "Channel_ID == \"" + channelId + "\" && " +
+                   "Event_Type == \"approval\" && " +
+                   "Timestamp >= \"" + startDate.toString("yyyy-MM-dd") + "\"";
+        
+        approvalEvents = zoho.creator.getRecords(
+            config.get("creator_app"),
+            "All_ComplianceLogs",
+            criteria,
+            "compliance_connection"
+        );
+        
+        if(approvalEvents.size() == 0)
+        {
+            return 48; // Default to 48 hours
+        }
+        
+        totalResponseTime = 0;
+        validEvents = 0;
+        
+        for each event in approvalEvents
+        {
+            // Calculate time from request to approval
+            requestTime = event.get("Request_Timestamp");
+            approvalTime = event.get("Timestamp");
+            
+            if(requestTime != null && approvalTime != null)
+            {
+                hoursDiff = hoursBetween(requestTime.toTime(), approvalTime.toTime());
+                totalResponseTime = totalResponseTime + hoursDiff;
+                validEvents = validEvents + 1;
+            }
+        }
+        
+        if(validEvents > 0)
+        {
+            return (totalResponseTime / validEvents).round(1);
+        }
+        else
+        {
+            return 48;
+        }
+    }
+    catch (e)
+    {
+        info "Error calculating response time: " + e;
+        return 48;
+    }
+}
+
+// Get dependency chain length from Zoho Projects
+Decimal getDependencyChainLength(String projectId)
+{
+    try
+    {
+        // Get all tasks for project
+        tasksResponse = invokeurl
+        [
+            url: "https://projectsapi.zoho.com/restapi/portal/" + config.get("projects_portal") + "/projects/" + projectId + "/tasks/"
+            type: GET
+            connection: "projects_connection"
+        ];
+        
+        tasks = tasksResponse.get("tasks");
+        
+        if(tasks.size() == 0)
+        {
+            return 1;
+        }
+        
+        // Build dependency graph
+        maxChainLength = 1;
+        
+        for each task in tasks
+        {
+            taskId = task.get("id");
+            dependencies = task.get("dependency");
+            
+            if(dependencies != null && dependencies.size() > 0)
+            {
+                chainLength = calculateChainLength(taskId, tasks, 1);
+                if(chainLength > maxChainLength)
+                {
+                    maxChainLength = chainLength;
+                }
+            }
+        }
+        
+        return maxChainLength;
+    }
+    catch (e)
+    {
+        info "Error calculating dependency chain: " + e;
+        return 2;
+    }
+}
+
+// Recursive function to calculate dependency chain length
+Decimal calculateChainLength(String taskId, List allTasks, Decimal currentDepth)
+{
+    if(currentDepth > 20)
+    {
+        return currentDepth; // Prevent infinite recursion
+    }
+    
+    // Find tasks that depend on this task
+    dependentTasks = List();
+    
+    for each task in allTasks
+    {
+        dependencies = task.get("dependency");
+        if(dependencies != null)
+        {
+            for each dep in dependencies
+            {
+                if(dep.get("id") == taskId)
+                {
+                    dependentTasks.add(task);
+                }
+            }
+        }
+    }
+    
+    if(dependentTasks.size() == 0)
+    {
+        return currentDepth;
+    }
+    
+    maxDepth = currentDepth;
+    
+    for each depTask in dependentTasks
+    {
+        depth = calculateChainLength(depTask.get("id"), allTasks, currentDepth + 1);
+        if(depth > maxDepth)
+        {
+            maxDepth = depth;
+        }
+    }
+    
+    return maxDepth;
+}
+
+// Get count of pending approvals
+Decimal getPendingApprovalsCount(String projectId)
+{
+    try
+    {
+        criteria = "Project_ID == \"" + projectId + "\" && " +
+                   "Event_Type == \"approval\" && " +
+                   "Status == \"Pending Review\"";
+        
+        pendingApprovals = zoho.creator.getRecords(
+            config.get("creator_app"),
+            "All_ComplianceLogs",
+            criteria,
+            "compliance_connection"
+        );
+        
+        return pendingApprovals.size();
+    }
+    catch (e)
+    {
+        return 0;
+    }
+}
+
+// Get team workload from Zoho Projects
+Decimal getTeamWorkload(String projectId)
+{
+    try
+    {
+        // Get project team members
+        teamResponse = invokeurl
+        [
+            url: "https://projectsapi.zoho.com/restapi/portal/" + config.get("projects_portal") + "/projects/" + projectId + "/users/"
+            type: GET
+            connection: "projects_connection"
+        ];
+        
+        users = teamResponse.get("users");
+        
+        if(users.size() == 0)
+        {
+            return 0.5; // Default medium workload
+        }
+        
+        totalWorkload = 0;
+        
+        for each user in users
+        {
+            userId = user.get("id");
+            
+            // Get user's task allocation
+            tasksResponse = invokeurl
+            [
+                url: "https://projectsapi.zoho.com/restapi/portal/" + config.get("projects_portal") + "/projects/" + projectId + "/tasks/?users=" + userId
+                type: GET
+                connection: "projects_connection"
+            ];
+            
+            userTasks = tasksResponse.get("tasks");
+            
+            // Calculate workload (tasks / time available)
+            openTasks = 0;
+            for each task in userTasks
+            {
+                if(task.get("status").get("name") != "Completed")
+                {
+                    openTasks = openTasks + 1;
+                }
+            }
+            
+            // Normalize to 0-1 scale (assume >8 tasks = 100% capacity)
+            userWorkload = openTasks / 8.0;
+            if(userWorkload > 1)
+            {
+                userWorkload = 1;
+            }
+            
+            totalWorkload = totalWorkload + userWorkload;
+        }
+        
+        avgWorkload = totalWorkload / users.size();
+        return avgWorkload.round(2);
+    }
+    catch (e)
+    {
+        info "Error calculating workload: " + e;
+        return 0.5;
+    }
+}
+
+// Get historical delay rate for project
+Decimal getHistoricalDelayRate(String projectId)
+{
+    try
+    {
+        // Get completed milestones
+        criteria = "Project_ID == \"" + projectId + "\" && " +
+                   "Event_Type == \"milestone\" && " +
+                   "Status == \"Completed\"";
+        
+        milestones = zoho.creator.getRecords(
+            config.get("creator_app"),
+            "All_ComplianceLogs",
+            criteria,
+            "compliance_connection"
+        );
+        
+        if(milestones.size() == 0)
+        {
+            return 0.3; // Default 30% delay rate
+        }
+        
+        delayedCount = 0;
+        
+        for each milestone in milestones
+        {
+            deadline = milestone.get("Deadline");
+            completedDate = milestone.get("Timestamp");
+            
+            if(deadline != null && completedDate != null)
+            {
+                if(completedDate.toDate() > deadline.toDate())
+                {
+                    delayedCount = delayedCount + 1;
+                }
+            }
+        }
+        
+        delayRate = delayedCount / milestones.size();
+        return delayRate.round(2);
+    }
+    catch (e)
+    {
+        return 0.3;
+    }
+}
+
+// Normalization functions (convert to 0-10 scale for risk scoring)
+
+Decimal normalizeDeadlineFactor(Decimal days)
+{
+    // < 3 days = 10, > 30 days = 0
+    if(days < 3)
+    {
+        return 10;
+    }
+    if(days > 30)
+    {
+        return 0;
+    }
+    return ((30 - days) / 27 * 10).round(2);
+}
+
+Decimal normalizeResponseTime(Decimal hours)
+{
+    // < 24 hrs = 0, > 120 hrs = 10
+    if(hours < 24)
+    {
+        return 0;
+    }
+    if(hours > 120)
+    {
+        return 10;
+    }
+    return ((hours - 24) / 96 * 10).round(2);
+}
+
+Decimal normalizeDependencyChain(Decimal length)
+{
+    // 1-2 deps = 0, >10 deps = 10
+    if(length <= 2)
+    {
+        return 0;
+    }
+    if(length >= 10)
+    {
+        return 10;
+    }
+    return ((length - 2) / 8 * 10).round(2);
+}
+
+Decimal normalizeApprovals(Decimal count)
+{
+    // 0 approvals = 0, >10 approvals = 10
+    if(count == 0)
+    {
+        return 0;
+    }
+    if(count >= 10)
+    {
+        return 10;
+    }
+    return (count / 10 * 10).round(2);
+}
+
+Decimal normalizeWorkload(Decimal workload)
+{
+    // 0-50% = 0, >90% = 10
+    if(workload < 0.5)
+    {
+        return 0;
+    }
+    if(workload > 0.9)
+    {
+        return 10;
+    }
+    return ((workload - 0.5) / 0.4 * 10).round(2);
+}
+
+Decimal normalizeDelayRate(Decimal rate)
+{
+    // 0% delays = 0, >50% delays = 10
+    if(rate == 0)
+    {
+        return 0;
+    }
+    if(rate >= 0.5)
+    {
+        return 10;
+    }
+    return (rate / 0.5 * 10).round(2);
+}
+
+// Send alert for high-risk dependency
+void sendDependencyAlert(Map project, Decimal riskScore)
+{
+    projectName = project.get("Project_Name");
+    channelId = project.get("Channel_ID");
+    stakeholders = project.get("Stakeholders").toList();
+    
+    // Get specific risk details
+    daysUntilDeadline = getDaysUntilDeadline(project.get("Project_ID"));
+    avgResponseTime = getAverageTeamResponseTime(project.get("Project_ID"));
+    dependencyLength = getDependencyChainLength(project.get("Project_ID"));
+    
+    // Build alert message
+    alertMessage = Map();
+    alertMessage.put("text", "⚠️ High Compliance Risk Detected: " + projectName);
+    
+    alertCard = Map();
+    alertCard.put("title", "Dependency Risk Alert");
+    alertCard.put("theme", "modern-inline");
+    
+    section1 = Map();
+    section1.put("id", 1);
+    section1.put("data", {
+        {"key": "Project", "value": projectName},
+        {"key": "Risk Score", "value": riskScore + "/10 🔴"},
+        {"key": "Days to Deadline", "value": daysUntilDeadline},
+        {"key": "Avg Response Time", "value": avgResponseTime + " hours"}
+    });
+    
+    section2 = Map();
+    section2.put("id", 2);
+    section2.put("title", "Risk Analysis");
+    section2.put("data", {
+        {"key": "Dependency Chain", "value": dependencyLength + " levels deep"},
+        {"key": "Recommendation", "value": getRecommendation(riskScore, daysUntilDeadline, avgResponseTime)}
+    });
+    
+    alertCard.put("sections", {section1, section2});
+    alertMessage.put("card", alertCard);
+    
+    // Post to project channel
+    postResponse = invokeurl
+    [
+        url: "https://cliq.zoho.com/api/v2/channelsbyname/" + channelId + "/message"
+        type: POST
+        parameters: alertMessage.toString()
+        connection: "cliq_connection"
+    ];
+    
+    // Also notify stakeholders via DM
+    for each stakeholder in stakeholders
+    {
+        notifyStakeholder(stakeholder, projectName, riskScore);
+    }
+}
+
+// Get recommendation based on risk factors
+String getRecommendation(Decimal riskScore, Decimal daysLeft, Decimal responseTime)
+{
+    if(daysLeft < 3 && responseTime > 48)
+    {
+        return "⚡ URGENT: Escalate to management for immediate review";
+    }
+    else if(riskScore > 8.5)
+    {
+        return "🚨 Request additional resources or extend deadline";
+    }
+    else if(responseTime > 72)
+    {
+        return "📧 Schedule dedicated approval session with team";
+    }
+    else
+    {
+        return "👀 Monitor closely and follow up on pending items";
+    }
+}
+
+// Notify individual stakeholder
+void notifyStakeholder(String stakeholder, String projectName, Decimal riskScore)
+{
+    dmMessage = {
+        "text": "You've been tagged in a high-risk compliance alert for " + projectName + ". Risk Score: " + riskScore + "/10. Please review immediately."
+    };
+    
+    invokeurl
+    [
+        url: "https://cliq.zoho.com/api/v2/users/" + stakeholder + "/message"
+        type: POST
+        parameters: dmMessage.toString()
+        connection: "cliq_connection"
+    ];
+}
+
+// Update risk score in database
+void updateRiskScore(String projectId, Decimal riskScore)
+{
+    updateData = Map();
+    updateData.put("Risk_Score", riskScore);
+    updateData.put("Last_Risk_Analysis", zoho.currenttime);
+    
+    zoho.creator.updateRecord(
+        config.get("creator_app"),
+        "All_Project_Settings",
+        projectId,
+        updateData,
+        "compliance_connection"
+    );
+}
