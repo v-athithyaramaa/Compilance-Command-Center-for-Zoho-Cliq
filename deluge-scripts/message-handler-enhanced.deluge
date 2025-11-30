@@ -1,0 +1,1246 @@
+
+// Compliance Command Center - Enhanced Message Handler
+// This handler receives messages, extracts compliance info with Gemini, and forwards to Catalyst
+response = Map();
+info "=== Message Handler Triggered ===";
+try 
+{
+	// Get Catalyst function URL
+	catalystUrl = "https://compliance-command-center-60059403643.development.catalystserverless.in/server/store-compliance-event/execute";
+	// Get message text safely
+	messageText = "";
+	messageId = "";
+	permalink = "";
+	channelId = "";
+	channelName = "";
+	userId = "";
+	userName = "";
+	// Extract message data using Zoho Cliq's standard variables
+	// Based on Zoho Cliq documentation: message, user, and chat objects are available
+	// Get message text
+	try 
+	{
+		messageText = message.toString();
+		info "Message text: " + messageText;
+	}
+	catch (e)
+	{
+		info "Error getting message text: " + e;
+		messageText = "";
+	}
+	// Get user information from 'user' object
+	try 
+	{
+		userId = user.get("id");
+		userName = user.get("first_name") + " " + user.get("last_name");
+		info "User extracted: " + userName + " (ID: " + userId + ")";
+	}
+	catch (e)
+	{
+		info "Error getting user info: " + e;
+	}
+	// Get channel information from 'chat' object
+	// According to Zoho docs, the chat object contains channel details
+	try 
+	{
+		// Get channel ID - try both 'id' and 'channel_id' fields
+		if(chat.containsKey("channel_id"))
+		{
+			channelId = chat.get("channel_id");
+		}
+		else if(chat.containsKey("id"))
+		{
+			channelId = chat.get("id");
+		}
+		// Get channel name from 'title' field (as per Zoho documentation)
+		if(chat.containsKey("title"))
+		{
+			channelName = chat.get("title");
+			// Remove # prefix if present
+			if(channelName.startsWith("#"))
+			{
+				channelName = channelName.substring(1);
+			}
+		}
+		else if(chat.containsKey("name"))
+		{
+			channelName = chat.get("name");
+		}
+		info "Channel extracted: " + channelName + " (ID: " + channelId + ")";
+	}
+	catch (e)
+	{
+		info "Error getting chat/channel info: " + e;
+	}
+	// Get message ID and permalink from message_details object
+	try 
+	{
+		if(message_details != null && !message_details.isNull())
+		{
+			if(message_details.containsKey("message"))
+			{
+				msgObj = message_details.get("message");
+				if(msgObj.containsKey("id"))
+				{
+					messageId = msgObj.get("id");
+				}
+				if(msgObj.containsKey("permalink"))
+				{
+					permalink = msgObj.get("permalink");
+				}
+			}
+		}
+	}
+	catch (e)
+	{
+		info "Error getting message_details: " + e;
+	}
+	// Generate message ID if still empty
+	if(messageId == "" || messageId == null)
+	{
+		messageId = zoho.currenttime.toString("yyyy-MM-dd-HH-mm-ss-SSS");
+		if(channelId != "")
+		{
+			messageId = messageId + "-" + channelId;
+		}
+		info "Generated fallback message ID: " + messageId;
+	}
+	// Log final extracted values
+	info "=== Final Extracted Values ===";
+	info "Channel ID: " + channelId;
+	info "Channel Name: " + channelName;
+	info "User ID: " + userId;
+	info "User Name: " + userName;
+	info "Message ID: " + messageId;
+	info "Message Text: " + messageText;
+	// Handle bot commands
+	if(messageText.toLowerCase().contains("/compliance-"))
+	{
+		command = messageText.toLowerCase();
+		// Help command
+		if(command.contains("help"))
+		{
+			helpText = "🛡 Compliance Command Center\n\n";
+			helpText = helpText + "Available commands:\n";
+			helpText = helpText + "• /compliance-help - Show this help\n";
+			helpText = helpText + "• /compliance-setup - Setup compliance alerts channel\n";
+			helpText = helpText + "• /compliance-score - Show compliance dashboard\n";
+			helpText = helpText + "• /compliance-summary [project] - Generate audit-ready PDF report\n";
+			helpText = helpText + "• /compliance-risks [days] - Show predicted risks\n";
+			helpText = helpText + "• /compliance-monitor on/off - Enable/disable monitoring\n";
+			response.put("text",helpText);
+			return response;
+		}
+		// Setup command - helps users configure compliance alerts channel
+		if(command.contains("setup"))
+		{
+			setupText = "⚙ Compliance Alerts Setup\n\n";
+			setupText = setupText + "The bot automatically detects compliance channels. Here's how it works:\n\n";
+			setupText = setupText + "📋 Option 1: Auto-Detection (Recommended)\n";
+			setupText = setupText + "Create a channel with one of these names:\n";
+			setupText = setupText + "• compliance-alerts (preferred)\n";
+			setupText = setupText + "• compliance-team\n";
+			setupText = setupText + "• compliance\n";
+			setupText = setupText + "• compliance-command-center\n\n";
+			setupText = setupText + "The bot will automatically find and use it! 🎯\n\n";
+			setupText = setupText + "📋 Option 2: Bot Variable (Admin)\n";
+			setupText = setupText + "Set COMPLIANCE_TEAM_CHANNEL_ID in bot variables with your channel ID.\n\n";
+			setupText = setupText + "📋 Option 3: Current Channel (Default)\n";
+			setupText = setupText + "If no dedicated channel is found, alerts go to the current channel.\n\n";
+			setupText = setupText + "💡 Tip: Create #compliance-alerts channel for best experience!";
+			response.put("text",setupText);
+			return response;
+		}
+		// Score command - Dashboard with metrics
+		if(command.contains("score"))
+		{
+			scoreUrl = "https://compliance-command-center-60059403643.development.catalystserverless.in/server/generate-summary/execute";
+			try 
+			{
+				scoreResponse = invokeurl
+				[
+					url :scoreUrl
+					type :GET
+					parameters:{"project":"all"}
+					connection:"catalyst_connection"
+				];
+				if(scoreResponse != null && scoreResponse.containsKey("compliance_score"))
+				{
+					// Build dashboard card
+					dashboardCard = Map();
+					dashboardCard.put("title","📊 Compliance Dashboard");
+					dashboardCard.put("theme","modern-inline");
+					sectionsList = List();
+					// Section 1: Key Metrics
+					section1 = Map();
+					section1.put("title","Key Metrics");
+					section1Data = List();
+					// Compliance Score
+					score = scoreResponse.get("compliance_score");
+					scoreDetail = Map();
+					scoreDetail.put("key","Compliance Score");
+					if(score >= 80)
+					{
+						scoreDetail.put("value","🟢 " + score + "/100");
+					}
+					else if(score >= 60)
+					{
+						scoreDetail.put("value","🟡 " + score + "/100");
+					}
+					else
+					{
+						scoreDetail.put("value","🔴 " + score + "/100");
+					}
+					section1Data.add(scoreDetail);
+					// Total Events
+					totalEvents = scoreResponse.get("total_events");
+					if(totalEvents == null)
+					{
+						totalEvents = 0;
+					}
+					eventsDetail = Map();
+					eventsDetail.put("key","Total Events Logged");
+					eventsDetail.put("value",totalEvents.toString());
+					section1Data.add(eventsDetail);
+					// Pending Actions
+					pendingActions = scoreResponse.get("pending_actions");
+					if(pendingActions == null)
+					{
+						pendingActions = List();
+					}
+					pendingDetail = Map();
+					pendingDetail.put("key","Pending Actions");
+					pendingDetail.put("value",pendingActions.size().toString());
+					section1Data.add(pendingDetail);
+					section1.put("data",section1Data);
+					sectionsList.add(section1);
+					// Section 2: Events Breakdown
+					section2 = Map();
+					section2.put("title","Events Breakdown");
+					section2Data = List();
+					// By Type
+					eventsByType = scoreResponse.get("events_by_type");
+					if(eventsByType != null)
+					{
+						typeDetail = Map();
+						typeText = "";
+						// In Deluge, iterate over map directly
+						for each  typeKey in eventsByType
+						{
+							typeCount = eventsByType.get(typeKey);
+							if(typeText != "")
+							{
+								typeText = typeText + ", ";
+							}
+							typeText = typeText + typeKey + ": " + typeCount;
+						}
+						if(typeText == "")
+						{
+							typeText = "No events yet";
+						}
+						typeDetail.put("key","By Type");
+						typeDetail.put("value",typeText);
+						section2Data.add(typeDetail);
+					}
+					// By Regulation
+					eventsByRegulation = scoreResponse.get("events_by_regulation");
+					if(eventsByRegulation != null)
+					{
+						regDetail = Map();
+						regText = "";
+						// In Deluge, iterate over map directly
+						for each  regKey in eventsByRegulation
+						{
+							regCount = eventsByRegulation.get(regKey);
+							if(regText != "")
+							{
+								regText = regText + ", ";
+							}
+							regText = regText + regKey + ": " + regCount;
+						}
+						if(regText == "")
+						{
+							regText = "No regulations tracked";
+						}
+						regDetail.put("key","By Regulation");
+						regDetail.put("value",regText);
+						section2Data.add(regDetail);
+					}
+					// By Risk Level
+					eventsByRisk = scoreResponse.get("events_by_risk");
+					if(eventsByRisk != null)
+					{
+						riskDetail = Map();
+						riskText = "";
+						// In Deluge, iterate over map directly
+						for each  riskKey in eventsByRisk
+						{
+							riskCount = eventsByRisk.get(riskKey);
+							if(riskText != "")
+							{
+								riskText = riskText + ", ";
+							}
+							riskText = riskText + riskKey + ": " + riskCount;
+						}
+						if(riskText == "")
+						{
+							riskText = "No risk data";
+						}
+						riskDetail.put("key","By Risk Level");
+						riskDetail.put("value",riskText);
+						section2Data.add(riskDetail);
+					}
+					section2.put("data",section2Data);
+					sectionsList.add(section2);
+					dashboardCard.put("sections",sectionsList);
+					// Add button to generate full report
+					buttonsList = List();
+					button1 = Map();
+					button1.put("label","Generate Full Report");
+					button1.put("type","open.url");
+					button1.put("url","cliq://compliance-summary");
+					buttonsList.add(button1);
+					dashboardCard.put("buttons",buttonsList);
+					response.put("card",dashboardCard);
+					response.put("text","📊 Compliance Dashboard");
+				}
+				else
+				{
+					response.put("text","📊 Compliance Dashboard: Calculating...");
+				}
+			}
+			catch (scoreError)
+			{
+				info "Score dashboard error: " + scoreError;
+				response.put("text","📊 Compliance Dashboard: Service unavailable");
+			}
+			return response;
+		}
+		// Summary command - Generate audit-ready PDF report with Gemini insights
+		if(command.contains("summary"))
+		{
+			// Extract project name from command
+			projectName = "all";
+			// Manual split - find space after "summary"
+			summaryIndex = messageText.toLowerCase().indexOf("summary");
+			if(summaryIndex >= 0)
+			{
+				afterSummary = messageText.substring(summaryIndex + 7);
+				// "summary" is 7 chars
+				afterSummary = afterSummary.trim();
+				if(afterSummary.length() > 0)
+				{
+					// Find first space to get the project name
+					spaceIndex = afterSummary.indexOf(" ");
+					if(spaceIndex > 0)
+					{
+						projectName = afterSummary.substring(0,spaceIndex);
+					}
+					else
+					{
+						projectName = afterSummary;
+					}
+				}
+			}
+			summaryUrl = "https://compliance-command-center-60059403643.development.catalystserverless.in/server/generate-summary/execute";
+			try 
+			{
+				summaryResponse = invokeurl
+				[
+					url :summaryUrl
+					type :GET
+					parameters:{"project":projectName}
+					connection:"catalyst_connection"
+				];
+				if(summaryResponse != null)
+				{
+					// Generate Gemini insights for the report
+					insights = "";
+					try 
+					{
+						// Get Gemini API key (same as extraction function)
+						// TODO: Replace with your actual Gemini API key from https://makersuite.google.com/app/apikey
+						geminiApiKey = "AIzaSyDTvzh9Q4ra90v3fUh3iXxYCzoynt-L1hA";
+						// Replace this with your actual API key
+						// Option: Get from Cliq bot variables
+						// geminiApiKey = zoho.cliq.getVariable("GEMINI_API_KEY");
+						if(geminiApiKey == null || geminiApiKey == "" || geminiApiKey == "YOUR_GEMINI_API_KEY_HERE")
+						{
+							// No Gemini key, return basic insights
+							insights = "Compliance report generated. Review events and metrics for detailed analysis.";
+						}
+						else
+						{
+							// Build prompt for Gemini - clean text (replace quotes with single quotes)
+							geminiPrompt = "Analyze this compliance data and generate executive insights. Total Events: " + summaryResponse.get("total_events") + ". Compliance Score: " + summaryResponse.get("compliance_score") + "/100. Period: " + summaryResponse.get("period") + ". ";
+							// Add events breakdown
+							eventsByType = summaryResponse.get("events_by_type");
+							if(eventsByType != null)
+							{
+								geminiPrompt = geminiPrompt + "Events by Type: " + eventsByType.toString().replaceAll("\"","'",true) + ". ";
+							}
+							eventsByRisk = summaryResponse.get("events_by_risk");
+							if(eventsByRisk != null)
+							{
+								geminiPrompt = geminiPrompt + "Events by Risk Level: " + eventsByRisk.toString().replaceAll("\"","'",true) + ". ";
+							}
+							pendingActions = summaryResponse.get("pending_actions");
+							if(pendingActions != null && pendingActions.size() > 0)
+							{
+								geminiPrompt = geminiPrompt + "Pending Actions: " + pendingActions.size() + ". ";
+							}
+							geminiPrompt = geminiPrompt + "Generate a concise executive summary (2-3 sentences) with: 1. Overall compliance health assessment 2. Key risks or concerns 3. Recommended actions. Return only the summary text, no formatting.";
+							// Call Gemini API - using gemini-2.5-flash model
+							geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiApiKey;
+							// Build JSON payload using Deluge Maps and Lists (let Deluge handle JSON conversion)
+							geminiPayload2 = Map();
+							contentsList2 = List();
+							contentMap2 = Map();
+							partsList2 = List();
+							partMap2 = Map();
+							partMap2.put("text",geminiPrompt);
+							partsList2.add(partMap2);
+							contentMap2.put("parts",partsList2);
+							contentsList2.add(contentMap2);
+							geminiPayload2.put("contents",contentsList2);
+							// Convert to JSON string using toString()
+							geminiJsonBody2 = geminiPayload2.toString();
+							// Create headers map
+							headersMap2 = Map();
+							headersMap2.put("Content-Type","application/json");
+							geminiResponse = invokeurl
+							[
+								url :geminiUrl
+								type :POST
+								body:geminiJsonBody2
+								headers:headersMap2
+							];
+							// Parse Gemini response
+							if(geminiResponse != null && geminiResponse.containsKey("candidates"))
+							{
+								candidates = geminiResponse.get("candidates");
+								if(candidates != null && candidates.size() > 0)
+								{
+									firstCandidate = candidates.get(0);
+									if(firstCandidate.containsKey("content"))
+									{
+										content = firstCandidate.get("content");
+										if(content.containsKey("parts"))
+										{
+											parts = content.get("parts");
+											if(parts != null && parts.size() > 0)
+											{
+												insights = parts.get(0).get("text");
+												info "Gemini insights generated: " + insights;
+											}
+										}
+									}
+								}
+							}
+							// Fallback if parsing fails
+							if(insights == null || insights == "")
+							{
+								insights = "Compliance report generated. Review events and metrics for detailed analysis.";
+							}
+						}
+					}
+					catch (geminiError)
+					{
+						info "Error generating Gemini insights: " + geminiError;
+						insights = "Compliance report generated. Review events and metrics for detailed analysis.";
+					}
+					// Call PDF generation function (or prepare report data)
+					pdfGenerationUrl = "https://compliance-command-center-60059403643.development.catalystserverless.in/server/generate-pdf-report/execute";
+					try 
+					{
+						pdfPayload = Map();
+						pdfPayload.put("project",projectName);
+						pdfPayload.put("summary_data",summaryResponse);
+						pdfPayload.put("insights",insights);
+						pdfResponse = invokeurl
+						[
+							url :pdfGenerationUrl
+							type :POST
+							parameters:pdfPayload
+							connection:"catalyst_connection"
+						];
+						reportUrl = "";
+						if(pdfResponse != null && pdfResponse.containsKey("report_url"))
+						{
+							reportUrl = pdfResponse.get("report_url");
+						}
+						else if(summaryResponse.containsKey("report_url"))
+						{
+							reportUrl = summaryResponse.get("report_url");
+						}
+						// Build response card
+						summaryCard = Map();
+						summaryCard.put("title","📋 Audit-Ready Compliance Report");
+						summaryCard.put("theme","modern-inline");
+						cardSections = List();
+						// Section 1: Report Summary
+						reportSection = Map();
+						reportSection.put("title","Report Summary");
+						reportData = List();
+						summaryDetail1 = Map();
+						summaryDetail1.put("key","Project");
+						summaryDetail1.put("value",projectName);
+						reportData.add(summaryDetail1);
+						summaryDetail2 = Map();
+						summaryDetail2.put("key","Total Events");
+						summaryDetail2.put("value",summaryResponse.get("total_events").toString());
+						reportData.add(summaryDetail2);
+						summaryDetail3 = Map();
+						summaryDetail3.put("key","Compliance Score");
+						summaryDetail3.put("value",summaryResponse.get("compliance_score") + "/100");
+						reportData.add(summaryDetail3);
+						summaryDetail4 = Map();
+						summaryDetail4.put("key","Period");
+						summaryDetail4.put("value",summaryResponse.get("period"));
+						reportData.add(summaryDetail4);
+						reportSection.put("data",reportData);
+						cardSections.add(reportSection);
+						// Section 2: Key Insights (from Gemini)
+						if(insights != null && insights != "")
+						{
+							insightsSection = Map();
+							insightsSection.put("title","AI-Generated Insights");
+							insightsData = List();
+							insightsDetail = Map();
+							insightsDetail.put("key","Summary");
+							// Truncate if too long
+							if(insights.length() > 300)
+							{
+								insightsDetail.put("value",insights.substring(0,297) + "...");
+							}
+							else
+							{
+								insightsDetail.put("value",insights);
+							}
+							insightsData.add(insightsDetail);
+							insightsSection.put("data",insightsData);
+							cardSections.add(insightsSection);
+						}
+						summaryCard.put("sections",cardSections);
+						// Add download button
+						reportButtons = List();
+						if(reportUrl != null && reportUrl != "")
+						{
+							downloadButton = Map();
+							downloadButton.put("label","📥 Download PDF Report");
+							downloadButton.put("type","open.url");
+							downloadButton.put("url",reportUrl);
+							reportButtons.add(downloadButton);
+						}
+						summaryCard.put("buttons",reportButtons);
+						response.put("card",summaryCard);
+						response.put("text","📋 Audit-ready compliance report generated for " + projectName);
+					}
+					catch (pdfError)
+					{
+						info "PDF generation error: " + pdfError;
+						// Fallback to text response
+						summaryText = "📋 Compliance Summary for " + projectName + "\n\n";
+						summaryText = summaryText + "Total Events: " + summaryResponse.get("total_events") + "\n";
+						summaryText = summaryText + "Compliance Score: " + summaryResponse.get("compliance_score") + "/100\n";
+						if(insights != null && insights != "")
+						{
+							summaryText = summaryText + "\n*AI Insights:*\n" + insights;
+						}
+						response.put("text",summaryText);
+					}
+				}
+				else
+				{
+					response.put("text","📋 Generating summary...");
+				}
+			}
+			catch (summaryError)
+			{
+				info "Summary error: " + summaryError;
+				response.put("text","📋 Summary: Service unavailable");
+			}
+			return response;
+		}
+		// Risks command
+		if(command.contains("risks"))
+		{
+			daysAhead = 7;
+			// Manual split - find space after "risks"
+			risksIndex = messageText.toLowerCase().indexOf("risks");
+			if(risksIndex >= 0)
+			{
+				afterRisks = messageText.substring(risksIndex + 5);
+				// "risks" is 5 chars
+				afterRisks = afterRisks.trim();
+				if(afterRisks.length() > 0)
+				{
+					// Find first space to get the number
+					spaceIndex = afterRisks.indexOf(" ");
+					if(spaceIndex > 0)
+					{
+						daysStr = afterRisks.substring(0,spaceIndex);
+					}
+					else
+					{
+						daysStr = afterRisks;
+					}
+					try 
+					{
+						daysAhead = daysStr.toLong();
+					}
+					catch (e)
+					{
+						daysAhead = 7;
+					}
+				}
+			}
+			risksUrl = "https://compliance-command-center-60059403643.development.catalystserverless.in/server/predict-risks/execute";
+			try 
+			{
+				risksResponse = invokeurl
+				[
+					url :risksUrl
+					type :GET
+					parameters:{"days_ahead":daysAhead.toString()}
+					connection:"catalyst_connection"
+				];
+				if(risksResponse != null)
+				{
+					risksText = "⚠ Predicted Risks (Next " + daysAhead + " days)\n\n";
+					risks = risksResponse.get("risks");
+					if(risks != null && risks.size() > 0)
+					{
+						for each  risk in risks
+						{
+							risksText = risksText + "• " + risk.get("category") + " - " + risk.get("severity") + "\n";
+						}
+					}
+					else
+					{
+						risksText = risksText + "No high-risk items predicted.";
+					}
+					response.put("text",risksText);
+				}
+				else
+				{
+					response.put("text","⚠ Analyzing risks...");
+				}
+			}
+			catch (risksError)
+			{
+				info "Risks error: " + risksError;
+				response.put("text","⚠ Risks: Service unavailable");
+			}
+			return response;
+		}
+		// Monitor command
+		if(command.contains("monitor"))
+		{
+			if(command.contains("on"))
+			{
+				response.put("text","✅ Compliance monitoring enabled for this channel!");
+			}
+			else if(command.contains("off"))
+			{
+				response.put("text","❌ Compliance monitoring disabled for this channel.");
+			}
+			else
+			{
+				response.put("text","Usage: /compliance-monitor on OR /compliance-monitor off");
+			}
+			return response;
+		}
+		response.put("text","Command not recognized. Type /compliance-help for available commands.");
+		return response;
+	}
+	// For regular messages, extract compliance info and send to Catalyst
+	if(messageText.length() > 0)
+	{
+		// Extract compliance info using rule-based method (or Gemini if available)
+		extractedData = Map();
+		// Get Gemini API key
+		// TODO: Replace with your actual Gemini API key from https://makersuite.google.com/app/apikey
+		geminiApiKey = "AIzaSyDTvzh9Q4ra90v3fUh3iXxYCzoynt-L1hA";
+		// Replace this with your actual API key
+		// Option: Get from Cliq bot variables
+		// geminiApiKey = zoho.cliq.getVariable("GEMINI_API_KEY");
+		// If no key set, will fallback to rule-based extraction
+		// Check if it's still the placeholder (not the actual key)
+		if(geminiApiKey == null || geminiApiKey == "" || geminiApiKey == "YOUR_GEMINI_API_KEY_HERE")
+		{
+			geminiApiKey = "";
+		}
+		// Try Gemini API first if key is available
+		geminiSuccess = false;
+		if(geminiApiKey != null && geminiApiKey != "" && geminiApiKey.length() > 10)
+		{
+			try 
+			{
+				info "Attempting Gemini extraction for: " + messageText;
+				// Create Gemini prompt - clean message text (replace quotes with single quotes to avoid JSON issues)
+				cleanedMessageText = messageText;
+				cleanedMessageText = cleanedMessageText.replaceAll("\"","'",true);
+				cleanedMessageText = cleanedMessageText.replaceAll("\n"," ",true);
+				cleanedMessageText = cleanedMessageText.replaceAll("\r"," ",true);
+				// Build prompt with cleaned message text
+				geminiPrompt = "Analyze this message for compliance-related information. Extract: 1. compliance_event: Type of event (approval, risk_discussion, decision, milestone, audit_action, or null if not compliance-related) 2. regulation_type: Regulation mentioned (GDPR, SOC2, HIPAA, ISO27001, PCI-DSS, or General if none) 3. risk_level: Risk level (Low, Medium, High, Critical, or Low if not specified) 4. decision_type: Type of decision if applicable (approval, rejection, escalation, or null) Message: " + cleanedMessageText + " Return ONLY a valid JSON object in this exact format: {compliance_event: approval or null, regulation_type: GDPR or General, risk_level: Low or Medium or High or Critical, decision_type: approval or null, confidence: 0.0 to 1.0}";
+				// Prepare Gemini API request - using gemini-2.5-flash model
+				geminiUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiApiKey;
+				// Build JSON payload using Deluge Maps and Lists (let Deluge handle JSON conversion)
+				geminiPayload = Map();
+				contentsList = List();
+				contentMap = Map();
+				partsList = List();
+				partMap = Map();
+				partMap.put("text",geminiPrompt);
+				partsList.add(partMap);
+				contentMap.put("parts",partsList);
+				contentsList.add(contentMap);
+				geminiPayload.put("contents",contentsList);
+				// Convert to JSON string using toString()
+				geminiJsonBody = geminiPayload.toString();
+				// Create headers map
+				headersMap = Map();
+				headersMap.put("Content-Type","application/json");
+				// Call Gemini API with JSON body
+				geminiResponse = invokeurl
+				[
+					url :geminiUrl
+					type :POST
+					body:geminiJsonBody
+					headers:headersMap
+				];
+				info "Gemini response received: " + geminiResponse;
+				// Parse Gemini response
+				if(geminiResponse != null && geminiResponse.containsKey("candidates"))
+				{
+					candidates = geminiResponse.get("candidates");
+					if(candidates != null && candidates.size() > 0)
+					{
+						firstCandidate = candidates.get(0);
+						if(firstCandidate.containsKey("content"))
+						{
+							content = firstCandidate.get("content");
+							if(content.containsKey("parts"))
+							{
+								parts = content.get("parts");
+								if(parts != null && parts.size() > 0)
+								{
+									geminiText = parts.get(0).get("text");
+									info "Gemini text response: " + geminiText;
+									// Parse Gemini response - use manual extraction (more reliable in Deluge)
+									eventType = null;
+									regulation = "General";
+									riskLevel = "Low";
+									decisionType = null;
+									confidence = 0.8;
+									// Extract compliance_event
+									if(geminiText.containsIgnoreCase("\"compliance_event\":\"approval\"") || geminiText.containsIgnoreCase("compliance_event.*approval"))
+									{
+										eventType = "approval";
+									}
+									else if(geminiText.containsIgnoreCase("\"compliance_event\":\"risk_discussion\"") || geminiText.containsIgnoreCase("compliance_event.*risk"))
+									{
+										eventType = "risk_discussion";
+									}
+									else if(geminiText.containsIgnoreCase("\"compliance_event\":\"decision\""))
+									{
+										eventType = "decision";
+									}
+									else if(geminiText.containsIgnoreCase("\"compliance_event\":\"milestone\""))
+									{
+										eventType = "milestone";
+									}
+									else if(geminiText.containsIgnoreCase("\"compliance_event\":\"audit_action\""))
+									{
+										eventType = "audit_action";
+									}
+									// Extract regulation_type
+									if(geminiText.containsIgnoreCase("\"regulation_type\":\"GDPR\"") || geminiText.containsIgnoreCase("GDPR"))
+									{
+										regulation = "GDPR";
+									}
+									else if(geminiText.containsIgnoreCase("\"regulation_type\":\"SOC2\"") || geminiText.containsIgnoreCase("SOC2") || geminiText.containsIgnoreCase("SOC 2"))
+									{
+										regulation = "SOC2";
+									}
+									else if(geminiText.containsIgnoreCase("\"regulation_type\":\"HIPAA\"") || geminiText.containsIgnoreCase("HIPAA"))
+									{
+										regulation = "HIPAA";
+									}
+									else if(geminiText.containsIgnoreCase("\"regulation_type\":\"ISO27001\"") || geminiText.containsIgnoreCase("ISO27001") || geminiText.containsIgnoreCase("ISO 27001"))
+									{
+										regulation = "ISO27001";
+									}
+									// Extract risk_level
+									if(geminiText.containsIgnoreCase("\"risk_level\":\"Critical\"") || geminiText.containsIgnoreCase("Critical"))
+									{
+										riskLevel = "Critical";
+									}
+									else if(geminiText.containsIgnoreCase("\"risk_level\":\"High\"") || geminiText.containsIgnoreCase("High risk"))
+									{
+										riskLevel = "High";
+									}
+									else if(geminiText.containsIgnoreCase("\"risk_level\":\"Medium\""))
+									{
+										riskLevel = "Medium";
+									}
+									// Extract decision_type if present
+									if(geminiText.containsIgnoreCase("\"decision_type\":\"approval\""))
+									{
+										decisionType = "approval";
+									}
+									else if(geminiText.containsIgnoreCase("\"decision_type\":\"rejection\""))
+									{
+										decisionType = "rejection";
+									}
+									// If we extracted something useful, use it
+									if(eventType != null || regulation != "General")
+									{
+										extractedData.put("event_type",eventType);
+										extractedData.put("regulation",regulation);
+										extractedData.put("risk_level",riskLevel);
+										extractedData.put("decision_type",decisionType);
+										extractedData.put("confidence",confidence);
+										info "Gemini extraction successful: " + extractedData;
+										geminiSuccess = true;
+									}
+								}
+							}
+						}
+					}
+				}
+				if(!geminiSuccess)
+				{
+					info "Gemini response parsing failed, falling back to rule-based";
+				}
+			}
+			catch (geminiError)
+			{
+				info "Gemini API error, falling back to rule-based: " + geminiError;
+			}
+		}
+		else
+		{
+			info "Gemini API key not configured, using rule-based extraction";
+		}
+		// Fallback to rule-based extraction if Gemini didn't work
+		if(!geminiSuccess)
+		{
+			lowerText = messageText.toLowerCase();
+			eventType = null;
+			regulation = "General";
+			riskLevel = "Low";
+			decisionType = null;
+			confidence = 0.3;
+			// Detect compliance event type
+			if(lowerText.contains("approved") || lowerText.contains("approval") || lowerText.contains("authorized") || lowerText.contains("signed off"))
+			{
+				eventType = "approval";
+				confidence = 0.8;
+			}
+			else if(lowerText.contains("risk") || lowerText.contains("concern") || lowerText.contains("issue") || lowerText.contains("problem"))
+			{
+				eventType = "risk_discussion";
+				confidence = 0.7;
+			}
+			else if(lowerText.contains("decided") || lowerText.contains("decision") || lowerText.contains("chose"))
+			{
+				eventType = "decision";
+				confidence = 0.7;
+			}
+			else if(lowerText.contains("completed") || lowerText.contains("finished") || lowerText.contains("delivered"))
+			{
+				eventType = "milestone";
+				confidence = 0.6;
+			}
+			else if(lowerText.contains("audit") || lowerText.contains("review") || lowerText.contains("inspection"))
+			{
+				eventType = "audit_action";
+				confidence = 0.7;
+			}
+			// Detect regulation
+			if(lowerText.contains("gdpr"))
+			{
+				regulation = "GDPR";
+				confidence = confidence + 0.1;
+			}
+			else if(lowerText.contains("soc2") || lowerText.contains("soc 2"))
+			{
+				regulation = "SOC2";
+				confidence = confidence + 0.1;
+			}
+			else if(lowerText.contains("hipaa"))
+			{
+				regulation = "HIPAA";
+				confidence = confidence + 0.1;
+			}
+			else if(lowerText.contains("iso27001") || lowerText.contains("iso 27001"))
+			{
+				regulation = "ISO27001";
+				confidence = confidence + 0.1;
+			}
+			// Detect risk level
+			if(lowerText.contains("critical") || lowerText.contains("urgent") || lowerText.contains("severe"))
+			{
+				riskLevel = "Critical";
+			}
+			else if(lowerText.contains("high risk") || lowerText.contains("high") && lowerText.contains("risk"))
+			{
+				riskLevel = "High";
+			}
+			else if(lowerText.contains("medium"))
+			{
+				riskLevel = "Medium";
+			}
+			extractedData.put("event_type",eventType);
+			extractedData.put("regulation",regulation);
+			extractedData.put("risk_level",riskLevel);
+			extractedData.put("decision_type",decisionType);
+			extractedData.put("confidence",confidence);
+			info "Rule-based extraction result: " + extractedData;
+		}
+		// Prepare payload with extracted compliance data
+		// Match exact field names from DataStore schema and Catalyst function
+		payload = Map();
+		// Required fields (matching DataStore schema)
+		payload.put("timestamp",zoho.currenttime.toString());
+		payload.put("channel_id",channelId);
+		payload.put("channel_name",channelName);
+		payload.put("message_id",messageId);
+		payload.put("message_text",messageText);
+		payload.put("evidence_url",permalink);
+		payload.put("user_id",userId);
+		payload.put("user_name",userName);
+		// Extracted compliance fields (from Gemini or rule-based)
+		payload.put("event_type",extractedData.get("event_type"));
+		payload.put("regulation",extractedData.get("regulation"));
+		payload.put("risk_level",extractedData.get("risk_level"));
+		payload.put("confidence_score",extractedData.get("confidence"));
+		// Optional fields (matching Catalyst function expectations)
+		payload.put("decision_type",extractedData.get("decision_type"));
+		// Can be null
+		payload.put("stakeholders","");
+		// Empty string or JSON array as string
+		// Extract deadline from message if mentioned (e.g., "by Friday", "deadline: 2024-12-15")
+		extractedDeadline = null;
+		try 
+		{
+			lowerText = messageText.toLowerCase();
+			if(lowerText.contains("by ") || lowerText.contains("deadline") || lowerText.contains("due "))
+			{
+				if(lowerText.contains("by friday") || lowerText.contains("deadline friday") || lowerText.contains("due friday"))
+				{
+					currentDate = zoho.currenttime;
+					daysUntilFriday = (5 - currentDate.getDayOfWeek()) % 7;
+					if(daysUntilFriday == 0)
+					{
+						daysUntilFriday = 7;
+					}
+					// Calculate target date by adding days using date components
+					targetYear = currentDate.getYear();
+					targetMonth = currentDate.getMonth();
+					targetDay = currentDate.getDay() + daysUntilFriday;
+					// Handle month overflow (simplified - assumes max 31 days per month)
+					if(targetDay > 31)
+					{
+						targetDay = targetDay - 31;
+						targetMonth = targetMonth + 1;
+						if(targetMonth > 12)
+						{
+							targetMonth = 1;
+							targetYear = targetYear + 1;
+						}
+					}
+					// Format as yyyy-MM-dd
+					monthStr = targetMonth.toString();
+					if(targetMonth < 10)
+					{
+						monthStr = "0" + monthStr;
+					}
+					dayStr = targetDay.toString();
+					if(targetDay < 10)
+					{
+						dayStr = "0" + dayStr;
+					}
+					extractedDeadline = targetYear.toString() + "-" + monthStr + "-" + dayStr;
+				}
+				else if(lowerText.contains("by monday") || lowerText.contains("deadline monday") || lowerText.contains("due monday"))
+				{
+					currentDate = zoho.currenttime;
+					daysUntilMonday = (1 - currentDate.getDayOfWeek() + 7) % 7;
+					if(daysUntilMonday == 0)
+					{
+						daysUntilMonday = 7;
+					}
+					// Calculate target date by adding days using date components
+					targetYear = currentDate.getYear();
+					targetMonth = currentDate.getMonth();
+					targetDay = currentDate.getDay() + daysUntilMonday;
+					// Handle month overflow (simplified - assumes max 31 days per month)
+					if(targetDay > 31)
+					{
+						targetDay = targetDay - 31;
+						targetMonth = targetMonth + 1;
+						if(targetMonth > 12)
+						{
+							targetMonth = 1;
+							targetYear = targetYear + 1;
+						}
+					}
+					// Format as yyyy-MM-dd
+					monthStr = targetMonth.toString();
+					if(targetMonth < 10)
+					{
+						monthStr = "0" + monthStr;
+					}
+					dayStr = targetDay.toString();
+					if(targetDay < 10)
+					{
+						dayStr = "0" + dayStr;
+					}
+					extractedDeadline = targetYear.toString() + "-" + monthStr + "-" + dayStr;
+				}
+			}
+		}
+		catch (e)
+		{
+			info "Error extracting deadline: " + e;
+			extractedDeadline = null;
+		}
+		payload.put("deadline",extractedDeadline);
+		// Can be null
+		payload.put("project_id",channelId);
+		// Use channel_id as project_id if not provided
+		payload.put("zia_entities","{}");
+		// Store extraction metadata as JSON string
+		// Only send to Catalyst if compliance-relevant content detected
+		if(extractedData.get("event_type") != null || extractedData.get("confidence") > 0.5)
+		{
+			try 
+			{
+				// Log payload before sending
+				info "Sending payload to Catalyst - channel_id: " + payload.get("channel_id") + ", message_id: " + payload.get("message_id");
+				// Convert Map to JSON string using toString() (as per Zoho documentation)
+				payloadJson = payload.toString();
+				// Create headers map for Content-Type
+				headersMap = Map();
+				headersMap.put("Content-Type","application/json");
+				// Send as JSON using parameters (not body) with Content-Type header
+				// According to Zoho docs: use parameters with toString() and set Content-Type header
+				catalystResponse = invokeurl
+				[
+					url :catalystUrl
+					type :POST
+					parameters:payloadJson
+					headers:headersMap
+					connection:"catalyst_connection"
+				];
+				info "Compliance event stored: " + catalystResponse;
+				// Check if high/critical risk - send alert
+				riskLevel = extractedData.get("risk_level");
+				if(riskLevel == "High" || riskLevel == "Critical")
+				{
+					try 
+					{
+						// Send risk alert to compliance team
+						// Smart channel detection - tries multiple methods in order:
+						// 1. Check bot variable (if admin configured it)
+						// 2. Try to find channel by common names (compliance-alerts, compliance-team, compliance)
+						// 3. Fall back to current channel (works out of the box)
+						complianceTeamChannelId = null;
+						complianceTeamChannelName = null;
+						// Note: Bot variables are not directly accessible in Deluge message handlers
+						// Using auto-detection by channel name instead
+						// Try to find channel by common names (auto-detection)
+						// Note: Requires 'cliq_connection' to be created in Cliq Message Handler connections
+						if(complianceTeamChannelId == null || complianceTeamChannelId == "")
+						{
+							channelNamesToTry = List();
+							channelNamesToTry.add("compliance-alerts");
+							channelNamesToTry.add("compliance-team");
+							channelNamesToTry.add("compliance");
+							channelNamesToTry.add("compliance-command-center");
+							channelLookupSuccess = false;
+							for each  channelNameToTry in channelNamesToTry
+							{
+								try 
+								{
+									// Try to get channel by name using Cliq API
+									// Requires 'cliq_connection' connection to be set up
+									channelLookupUrl = "https://cliq.zoho.com/api/v2/channelsbyname/" + channelNameToTry;
+									channelResponse = invokeurl
+									[
+										url :channelLookupUrl
+										type :GET
+										connection:"cliq_connection"
+									];
+									if(channelResponse != null && channelResponse.containsKey("id"))
+									{
+										complianceTeamChannelId = channelResponse.get("id");
+										complianceTeamChannelName = channelNameToTry;
+										info "Auto-detected compliance channel: " + channelNameToTry + " (ID: " + complianceTeamChannelId + ")";
+										channelLookupSuccess = true;
+										break;
+									}
+								}
+								catch (lookupError)
+								{
+									// Channel not found or connection error, try next name
+									// If connection doesn't exist, will fall through to current channel
+									continue;
+								}
+							}
+							// If channel lookup failed (connection not set up), skip auto-detection
+							if(!channelLookupSuccess)
+							{
+								info "Note: cliq_connection not available. Alerts will go to current channel.";
+							}
+						}
+						// Method 3: Fall back to current channel (works out of the box, no config needed)
+						if(complianceTeamChannelId == null || complianceTeamChannelId == "")
+						{
+							complianceTeamChannelId = channelId;
+							complianceTeamChannelName = channelName;
+							info "No compliance team channel found, using current channel: " + channelName;
+						}
+						eventType = extractedData.get("event_type");
+						regulation = extractedData.get("regulation");
+						riskLevel = extractedData.get("risk_level");
+						// Build alert message with card
+						alertMessage = Map();
+						alertMessage.put("text","🚨 " + riskLevel + " Risk Compliance Event Detected");
+						// Create card for better visibility
+						alertCard = Map();
+						alertCard.put("title","⚠ Immediate Attention Required");
+						alertCard.put("theme","modern-inline");
+						// Card sections
+						sectionsList = List();
+						// Section 1: Event Details
+						section1 = Map();
+						section1.put("title","Event Details");
+						section1Data = List();
+						detail1 = Map();
+						detail1.put("key","Event Type");
+						detail1.put("value",eventType);
+						section1Data.add(detail1);
+						detail2 = Map();
+						detail2.put("key","Regulation");
+						detail2.put("value",regulation);
+						section1Data.add(detail2);
+						detail3 = Map();
+						detail3.put("key","Risk Level");
+						if(riskLevel == "Critical")
+						{
+							detail3.put("value","🔴 CRITICAL");
+						}
+						else
+						{
+							detail3.put("value","🟠 HIGH");
+						}
+						section1Data.add(detail3);
+						detail4 = Map();
+						detail4.put("key","Channel");
+						detail4.put("value",channelName);
+						section1Data.add(detail4);
+						detail5 = Map();
+						detail5.put("key","Reported By");
+						detail5.put("value",userName);
+						section1Data.add(detail5);
+						section1.put("data",section1Data);
+						sectionsList.add(section1);
+						// Section 2: Message Preview
+						section2 = Map();
+						section2.put("title","Message Preview");
+						section2Data = List();
+						detail6 = Map();
+						detail6.put("key","Message");
+						// Truncate long messages
+						if(messageText.length() > 200)
+						{
+							detail6.put("value",messageText.substring(0,197) + "...");
+						}
+						else
+						{
+							detail6.put("value",messageText);
+						}
+						section2Data.add(detail6);
+						section2.put("data",section2Data);
+						sectionsList.add(section2);
+						// Add helpful note if using current channel (not a dedicated compliance channel)
+						if(complianceTeamChannelId == channelId)
+						{
+							section3 = Map();
+							section3.put("title","💡 Setup Tip");
+							section3Data = List();
+							tipDetail = Map();
+							tipDetail.put("key","Tip");
+							tipDetail.put("value","Create a channel named 'compliance-alerts' or 'compliance-team' to receive all alerts in one place. Or set COMPLIANCE_TEAM_CHANNEL_ID in bot variables.");
+							section3Data.add(tipDetail);
+							section3.put("data",section3Data);
+							sectionsList.add(section3);
+						}
+						alertCard.put("sections",sectionsList);
+						// Add button to view original message
+						buttonsList = List();
+						if(permalink != null && permalink != "")
+						{
+							button1 = Map();
+							button1.put("label","View Original Message");
+							button1.put("type","open.url");
+							button1.put("url",permalink);
+							buttonsList.add(button1);
+						}
+						alertCard.put("buttons",buttonsList);
+						alertMessage.put("card",alertCard);
+						// Send alert to compliance team channel
+						// Use Cliq API to post message
+						// Requires 'cliq_connection' connection to be set up
+						if(complianceTeamChannelId != null && complianceTeamChannelId != "")
+						{
+							try 
+							{
+								cliqApiUrl = "https://cliq.zoho.com/api/v2/channels/" + complianceTeamChannelId + "/message";
+								alertResponse = invokeurl
+								[
+									url :cliqApiUrl
+									type :POST
+									parameters:alertMessage
+									connection:"cliq_connection"
+								];
+								info "Risk alert sent to compliance team channel: " + complianceTeamChannelName;
+							}
+							catch (sendError)
+							{
+								// If connection doesn't exist or send fails, log the error
+								// Alert will not be sent, but compliance event is still stored
+								info "Could not send alert to compliance channel (cliq_connection may not be set up): " + sendError;
+							}
+						}
+						else
+						{
+							info "No compliance team channel found. Alert not sent (compliance event still stored).";
+						}
+					}
+					catch (alertError)
+					{
+						info "Error sending risk alert: " + alertError;
+					}
+				}
+			}
+			catch (catalystError)
+			{
+				info "Error calling Catalyst: " + catalystError;
+			}
+		}
+	}
+	// Don't send response for regular messages (passive monitoring)
+	response.put("text","");
+}
+catch (e)
+{
+	info "Error in message handler: " + e;
+	response.put("text","");
+}
+return response;
