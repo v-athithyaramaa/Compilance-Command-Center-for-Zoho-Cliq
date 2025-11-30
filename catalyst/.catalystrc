@@ -1,0 +1,36 @@
+{
+  "defaults": {
+    "project": 1,
+    "env": 1
+  },
+  "actives": {
+    "project": 1,
+    "env": 1
+  },
+  "projects": [
+    {
+      "idx": 1,
+      "id": "14899000000011082",
+      "name": "compliance-command-center",
+      "domain": {
+        "id": "50036338991",
+        "name": "compliance-command-center-60059403643.development"
+      },
+      "timezone": "Asia/Kolkata",
+      "env": [
+        {
+          "idx": 1,
+          "id": "60059403643",
+          "name": "Development",
+          "type": 3
+        },
+        {
+          "idx": 2,
+          "id": "50036361939",
+          "name": "Production",
+          "type": 1
+        }
+      ]
+    }
+  ]
+}

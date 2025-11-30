@@ -55,15 +55,49 @@ catalyst cron deploy
 
 ### 2. Configure Zia Skills Models
 
-```bash
-# Upload Zia Skills configuration
-zia-cli upload-model --file zia-skills/compliance-extractor.json
-zia-cli upload-model --file zia-skills/risk-predictor.json
+**Note:** Zia Skills models are configured through the Zoho Developer Console, not via CLI. The JSON files in `zia-skills/` directory are reference configurations.
 
-# Train models (requires training data)
-zia-cli train-model --model-id compliance_extractor_v1
-zia-cli train-model --model-id risk_predictor_v1
-```
+**Manual Setup Steps:**
+
+1. **Access Zia Skills Console**
+   - Go to https://zia.zoho.com
+   - Navigate to Developer Console > Skills
+
+2. **Create Compliance Event Extractor Model**
+   - Click "Create New Skill"
+   - Select "Custom NLP Model"
+   - Name: "Compliance Event Extractor"
+   - Model ID: `compliance_extractor_v1`
+   - Upload training data or configure entities based on `zia-skills/compliance-extractor.json`
+
+   **Key Entities to Configure:**
+   - Event Types: approval, risk_discussion, decision, documentation_request
+   - Regulations: GDPR, SOC2, HIPAA, PCI-DSS, ISO27001
+   - Risk Levels: high, medium, low
+   - Stakeholders: Extract @mentions and names
+
+3. **Create Risk Predictor Model**
+   - Click "Create New Skill"
+   - Select "Predictive Model"
+   - Name: "Compliance Risk Predictor"
+   - Model ID: `risk_predictor_v1`
+   - Configure features based on `zia-skills/risk-predictor.json`
+
+4. **Get API Credentials**
+   - Navigate to API Settings
+   - Generate API Key for Zia Skills
+   - Note down the API endpoint and key
+   - Update Catalyst environment variables with these credentials
+
+**Alternative: Use Rule-Based Extraction Initially**
+
+If Zia Skills setup is complex, you can start with rule-based extraction using the Catalyst functions, which already implement keyword matching and pattern recognition. The system will work without Zia Skills, though with reduced accuracy.
+
+To use rule-based extraction:
+
+- Skip Zia Skills setup
+- The Catalyst functions (`store-compliance-event.js`) have built-in fallback logic
+- ML models can be added later as an enhancement
 
 **Note:** Zia models require historical conversation data for training. Initial deployment uses rule-based extraction until sufficient training data is available.
 
@@ -225,28 +259,31 @@ Set the `COMPLIANCE_TEAM_CHANNEL_ID` to receive high-priority alerts:
 For best accuracy, train Zia models with your organization's data:
 
 1. **Export Historical Conversations**
-
-   ```bash
-   # Export 6 months of compliance-related messages
-   cliq-cli export-messages --channels compliance,legal,security --period 6m
-   ```
+   - Go to Zoho Cliq > Settings > Data Export
+   - Select channels: compliance, legal, security
+   - Export last 6 months of messages
+   - Download as JSON or CSV
 
 2. **Annotate Training Data**
    - Label compliance events (approval, risk, decision, etc.)
    - Tag regulations (GDPR, SOC2, HIPAA)
    - Mark risk levels
+   - Tools: Use Excel/CSV editor or custom annotation tool
 
 3. **Upload to Zia Skills**
-
-   ```bash
-   zia-cli upload-training-data --model compliance_extractor_v1 --file training-data.json
-   zia-cli retrain-model --model compliance_extractor_v1
-   ```
+   - Go to https://zia.zoho.com/console
+   - Select your model (`compliance_extractor_v1`)
+   - Navigate to Training > Upload Data
+   - Upload your annotated training data file
+   - Click "Train Model"
+   - Wait for training to complete (may take several hours)
 
 4. **Validate Model**
-   ```bash
-   zia-cli test-model --model compliance_extractor_v1 --test-set validation.json
-   ```
+   - In Zia Console, go to Testing
+   - Upload validation dataset
+   - Review accuracy metrics
+   - Adjust model parameters if needed
+   - Deploy model to production when satisfied
 
 ## Verification Steps
 

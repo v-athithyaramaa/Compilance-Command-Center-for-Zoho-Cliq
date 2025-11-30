@@ -1,0 +1,336 @@
+{
+  "datastore": {
+    "tables": [
+      {
+        "table_name": "compliance_events",
+        "columns": [
+          {
+            "column_name": "event_id",
+            "data_type": "bigint",
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "timestamp",
+            "data_type": "datetime",
+            "is_mandatory": true
+          },
+          {
+            "column_name": "channel_id",
+            "data_type": "varchar",
+            "max_length": 100,
+            "is_mandatory": true
+          },
+          {
+            "column_name": "channel_name",
+            "data_type": "varchar",
+            "max_length": 255
+          },
+          {
+            "column_name": "message_id",
+            "data_type": "varchar",
+            "max_length": 100,
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "user_id",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "user_name",
+            "data_type": "varchar",
+            "max_length": 255
+          },
+          {
+            "column_name": "event_type",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "regulation",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "risk_level",
+            "data_type": "varchar",
+            "max_length": 20
+          },
+          {
+            "column_name": "decision_type",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "message_text",
+            "data_type": "text"
+          },
+          {
+            "column_name": "evidence_url",
+            "data_type": "varchar",
+            "max_length": 500
+          },
+          {
+            "column_name": "confidence_score",
+            "data_type": "double"
+          },
+          {
+            "column_name": "stakeholders",
+            "data_type": "text"
+          },
+          {
+            "column_name": "deadline",
+            "data_type": "datetime"
+          },
+          {
+            "column_name": "project_id",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "status",
+            "data_type": "varchar",
+            "max_length": 50,
+            "default_value": "Pending Review"
+          },
+          {
+            "column_name": "zia_entities",
+            "data_type": "text"
+          },
+          {
+            "column_name": "created_at",
+            "data_type": "datetime",
+            "is_mandatory": true
+          }
+        ]
+      },
+      {
+        "table_name": "risk_predictions",
+        "columns": [
+          {
+            "column_name": "prediction_id",
+            "data_type": "bigint",
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "project_id",
+            "data_type": "varchar",
+            "max_length": 100,
+            "is_mandatory": true
+          },
+          {
+            "column_name": "risk_category",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "severity",
+            "data_type": "varchar",
+            "max_length": 20
+          },
+          {
+            "column_name": "probability",
+            "data_type": "double"
+          },
+          {
+            "column_name": "predicted_impact_date",
+            "data_type": "datetime"
+          },
+          {
+            "column_name": "affected_teams",
+            "data_type": "text"
+          },
+          {
+            "column_name": "contributing_factors",
+            "data_type": "text"
+          },
+          {
+            "column_name": "recommendations",
+            "data_type": "text"
+          },
+          {
+            "column_name": "confidence",
+            "data_type": "double"
+          },
+          {
+            "column_name": "status",
+            "data_type": "varchar",
+            "max_length": 20,
+            "default_value": "Active"
+          },
+          {
+            "column_name": "created_at",
+            "data_type": "datetime",
+            "is_mandatory": true
+          },
+          {
+            "column_name": "resolved_at",
+            "data_type": "datetime"
+          }
+        ]
+      },
+      {
+        "table_name": "compliance_analytics",
+        "columns": [
+          {
+            "column_name": "analytics_id",
+            "data_type": "bigint",
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "project_id",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "date",
+            "data_type": "date",
+            "is_mandatory": true
+          },
+          {
+            "column_name": "total_events",
+            "data_type": "int"
+          },
+          {
+            "column_name": "compliance_score",
+            "data_type": "double"
+          },
+          {
+            "column_name": "high_risk_count",
+            "data_type": "int"
+          },
+          {
+            "column_name": "pending_approvals",
+            "data_type": "int"
+          },
+          {
+            "column_name": "avg_response_time_hours",
+            "data_type": "double"
+          },
+          {
+            "column_name": "events_by_type",
+            "data_type": "text"
+          },
+          {
+            "column_name": "events_by_regulation",
+            "data_type": "text"
+          },
+          {
+            "column_name": "team_velocity",
+            "data_type": "double"
+          },
+          {
+            "column_name": "created_at",
+            "data_type": "datetime",
+            "is_mandatory": true
+          }
+        ]
+      },
+      {
+        "table_name": "audit_logs",
+        "columns": [
+          {
+            "column_name": "log_id",
+            "data_type": "bigint",
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "event_ids",
+            "data_type": "text"
+          },
+          {
+            "column_name": "export_timestamp",
+            "data_type": "datetime",
+            "is_mandatory": true
+          },
+          {
+            "column_name": "exported_by",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "project_id",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "regulation",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "period_start",
+            "data_type": "date"
+          },
+          {
+            "column_name": "period_end",
+            "data_type": "date"
+          },
+          {
+            "column_name": "report_hash",
+            "data_type": "varchar",
+            "max_length": 64
+          },
+          {
+            "column_name": "previous_hash",
+            "data_type": "varchar",
+            "max_length": 64
+          },
+          {
+            "column_name": "storage_url",
+            "data_type": "varchar",
+            "max_length": 500
+          },
+          {
+            "column_name": "metadata",
+            "data_type": "text"
+          }
+        ]
+      },
+      {
+        "table_name": "ml_training_data",
+        "columns": [
+          {
+            "column_name": "training_id",
+            "data_type": "bigint",
+            "is_mandatory": true,
+            "is_unique": true
+          },
+          {
+            "column_name": "project_id",
+            "data_type": "varchar",
+            "max_length": 100
+          },
+          {
+            "column_name": "feature_vector",
+            "data_type": "text"
+          },
+          {
+            "column_name": "actual_outcome",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "predicted_outcome",
+            "data_type": "varchar",
+            "max_length": 50
+          },
+          {
+            "column_name": "prediction_accuracy",
+            "data_type": "double"
+          },
+          {
+            "column_name": "recorded_at",
+            "data_type": "datetime",
+            "is_mandatory": true
+          }
+        ]
+      }
+    ]
+  }
+}

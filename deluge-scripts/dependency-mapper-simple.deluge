@@ -1,0 +1,28 @@
+try
+{
+	info "Starting dependency mapping...";
+	allEvents = ComplianceLogs[ID != 0];
+	projectMap = Map();
+	for each  event in allEvents
+	{
+		projectId = event.project_id;
+		if(projectId != null && projectId != "")
+		{
+			if(!projectMap.containsKey(projectId))
+			{
+				projectMap.put(projectId,0);
+			}
+			projectMap.put(projectId,projectMap.get(projectId) + 1);
+		}
+	}
+	info "Dependency Mapping - Total Projects: " + projectMap.keys().size();
+	for each  projectId in projectMap.keys()
+	{
+		eventCount = projectMap.get(projectId);
+		info "Project: " + projectId + ", Events: " + eventCount;
+	}
+}
+catch (e)
+{
+	info "Error in dependency mapping: " + e;
+}

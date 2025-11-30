@@ -1,236 +1,62 @@
-/*
- * Multi-Source Event Aggregator
- * Listens to Cliq webhooks, filters compliance events, and stores to Zoho Creator
- */
-
-// Configuration
-config = {
-    "creator_app": "compliance_tracker",
-    "creator_table": "ComplianceLogs",
-    "zia_model_id": "compliance_extractor_v1"
-};
-
-// Main event aggregator function
-void eventAggregator(Map webhookData)
+void EventAggregator(Map event_data)
 {
-    try
-    {
-        // Extract message data
-        messageText = webhookData.get("message").get("text");
-        channel = webhookData.get("channel");
-        user = webhookData.get("user");
-        timestamp = webhookData.get("timestamp");
-        messageId = webhookData.get("message").get("id");
-        permalink = webhookData.get("message").get("permalink");
-        attachments = webhookData.get("message").get("attachments");
-        
-        // Check if channel is monitored
-        isMonitored = checkChannelMonitoring(channel.get("id"));
-        
-        if(isMonitored)
-        {
-            // Extract compliance-relevant keywords using regex
-            complianceKeywords = {"approved", "sign off", "risk", "decision", "completed", 
-                                 "audit", "GDPR", "SOC2", "HIPAA", "ISO", "security", 
-                                 "data", "compliance", "regulatory", "incident"};
-            
-            containsKeyword = false;
-            for each keyword in complianceKeywords
-            {
-                if(messageText.containsIgnoreCase(keyword))
-                {
-                    containsKeyword = true;
-                    break;
-                }
-            }
-            
-            // If message contains compliance keywords, process with Zia
-            if(containsKeyword)
-            {
-                // Call Zia Skills API for entity extraction
-                ziaResponse = invokeurl
-                [
-                    url: "https://zia.zoho.com/api/v1/skills/extract"
-                    type: POST
-                    parameters: {
-                        "text": messageText,
-                        "model_id": config.get("zia_model_id")
-                    }
-                    connection: "zia_connection"
-                ];
-                
-                // Extract entities from Zia response
-                entities = ziaResponse.get("entities");
-                confidence = ziaResponse.get("confidence");
-                
-                // Only proceed if confidence is above threshold
-                if(confidence > 0.65)
-                {
-                    complianceEvent = entities.get("compliance_event");
-                    regulationType = entities.get("regulation_type");
-                    riskLevel = entities.get("risk_level");
-                    decisionType = entities.get("decision_type");
-                    stakeholders = entities.get("stakeholders");
-                    deadlines = entities.get("deadlines");
-                    
-                    // Create compliance log record
-                    complianceRecord = Map();
-                    complianceRecord.put("Timestamp", timestamp);
-                    complianceRecord.put("Channel_ID", channel.get("id"));
-                    complianceRecord.put("Channel_Name", channel.get("name"));
-                    complianceRecord.put("Message_ID", messageId);
-                    complianceRecord.put("User_ID", user.get("id"));
-                    complianceRecord.put("User_Name", user.get("name"));
-                    complianceRecord.put("Event_Type", ifnull(complianceEvent.get("value"), "General"));
-                    complianceRecord.put("Regulation", ifnull(regulationType.get("value"), "General"));
-                    complianceRecord.put("Risk_Level", ifnull(riskLevel.get("value"), "Low"));
-                    complianceRecord.put("Decision_Type", ifnull(decisionType.get("value"), ""));
-                    complianceRecord.put("Message_Text", messageText);
-                    complianceRecord.put("Evidence_URL", permalink);
-                    complianceRecord.put("Confidence_Score", confidence);
-                    complianceRecord.put("Status", "Pending Review");
-                    
-                    // Add stakeholders (convert list to comma-separated string)
-                    if(stakeholders != null && stakeholders.size() > 0)
-                    {
-                        stakeholderList = List();
-                        for each stakeholder in stakeholders
-                        {
-                            stakeholderList.add(stakeholder.get("name"));
-                        }
-                        complianceRecord.put("Stakeholders", stakeholderList.toString());
-                    }
-                    
-                    // Add deadline if extracted
-                    if(deadlines != null && deadlines.size() > 0)
-                    {
-                        firstDeadline = deadlines.get(0);
-                        complianceRecord.put("Deadline", firstDeadline.get("date"));
-                    }
-                    
-                    // Add file attachments metadata
-                    if(attachments != null && attachments.size() > 0)
-                    {
-                        fileList = List();
-                        for each file in attachments
-                        {
-                            fileList.add(file.get("name"));
-                        }
-                        complianceRecord.put("Attachments", fileList.toString());
-                    }
-                    
-                    // Insert into Zoho Creator
-                    insertResponse = zoho.creator.createRecord(
-                        config.get("creator_app"),
-                        "All_" + config.get("creator_table"),
-                        complianceRecord,
-                        "compliance_connection"
-                    );
-                    
-                    recordId = insertResponse.get("ID");
-                    
-                    // If high/critical risk, send to Catalyst for immediate alert processing
-                    if(riskLevel.get("value") == "High" || riskLevel.get("value") == "Critical")
-                    {
-                        alertPayload = Map();
-                        alertPayload.put("record_id", recordId);
-                        alertPayload.put("event_type", complianceEvent.get("value"));
-                        alertPayload.put("risk_level", riskLevel.get("value"));
-                        alertPayload.put("channel", channel.get("name"));
-                        alertPayload.put("user", user.get("name"));
-                        alertPayload.put("message_url", permalink);
-                        
-                        // Call Catalyst function for alert
-                        catalystResponse = invokeurl
-                        [
-                            url: "${CATALYST_URL}/functions/send-risk-alert"
-                            type: POST
-                            parameters: alertPayload.toString()
-                            connection: "catalyst_connection"
-                        ];
-                    }
-                    
-                    // Send to Catalyst for analytics and ML pipeline
-                    catalystPayload = Map();
-                    catalystPayload.put("event_data", complianceRecord);
-                    catalystPayload.put("zia_entities", entities);
-                    catalystPayload.put("message_metadata", {
-                        "thread_id": webhookData.get("message").get("thread_id"),
-                        "reply_count": webhookData.get("message").get("reply_count"),
-                        "reactions": webhookData.get("message").get("reactions")
-                    });
-                    
-                    invokeurl
-                    [
-                        url: "${CATALYST_URL}/functions/process-compliance-event"
-                        type: POST
-                        parameters: catalystPayload.toString()
-                        connection: "catalyst_connection"
-                    ];
-                    
-                    info "Compliance event logged: " + recordId;
-                }
-            }
-        }
-    }
-    catch (e)
-    {
-        info "Error in event aggregator: " + e;
-    }
-}
-
-// Check if channel has monitoring enabled
-boolean checkChannelMonitoring(String channelId)
-{
-    try
-    {
-        // Query Creator for channel monitoring settings
-        criteria = "Channel_ID == \"" + channelId + "\" && Monitoring_Enabled == true";
-        monitoringRecords = zoho.creator.getRecords(
-            config.get("creator_app"),
-            "All_Channel_Settings",
-            criteria,
-            "compliance_connection"
-        );
-        
-        return monitoringRecords.size() > 0;
-    }
-    catch (e)
-    {
-        // Default to false if error
-        return false;
-    }
-}
-
-// Helper function to extract mentions from text
-List extractMentions(String text)
-{
-    mentions = List();
-    pattern = "@[\\w-]+";
-    
-    // Regex matching for @mentions
-    matches = text.getMatches(pattern);
-    
-    for each match in matches
-    {
-        mentions.add(match);
-    }
-    
-    return mentions;
-}
-
-// Helper function to extract hashtags
-List extractHashtags(String text)
-{
-    hashtags = List();
-    pattern = "#[\\w-]+";
-    
-    matches = text.getMatches(pattern);
-    
-    for each match in matches
-    {
-        hashtags.add(match);
-    }
-    
-    return hashtags;
+	try
+	{
+		config = Map();
+		config.put("creator_app","compliance_tracker");
+		config.put("creator_table","ComplianceLogs");
+		config.put("zia_model_id","compliance_extractor_v1");
+		messageText = event_data.get("message").get("text");
+		channel = event_data.get("channel");
+		user = event_data.get("user");
+		timestamp = event_data.get("timestamp");
+		messageId = event_data.get("message").get("id");
+		permalink = event_data.get("message").get("permalink");
+		attachments = event_data.get("message").get("attachments");
+		isMonitored = true;
+		if(isMonitored)
+		{
+			complianceKeywords = {"approved","sign off","risk","decision","completed","audit","GDPR","SOC2","HIPAA","ISO","security","data","compliance","regulatory","incident"};
+			containsKeyword = false;
+			for each  keyword in complianceKeywords
+			{
+				if(messageText.containsIgnoreCase(keyword))
+				{
+					containsKeyword = true;
+					break;
+				}
+			}
+			if(containsKeyword)
+			{
+				attachmentsList = "";
+				if(attachments != null && attachments.size() > 0)
+				{
+					fileList = List();
+					for each  file in attachments
+					{
+						fileList.add(file.get("name"));
+					}
+					attachmentsList = fileList.toString();
+				}
+				insert into ComplianceLogs
+				[
+					event_id=messageId
+					timestamp=timestamp
+					channel_name=channel.get("name")
+					user_name=user.get("name")
+					regulation="General"
+					event_type="General"
+					risk_level="Low"
+					message_text=messageText
+					status="Pending Review"
+					project_id=""
+				];
+				info "Compliance event logged";
+			}
+		}
+	}
+	catch (e)
+	{
+		info "Error in event aggregator: " + e;
+	}
 }
